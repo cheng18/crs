@@ -24,6 +24,10 @@ import random
 import tokenization
 import tensorflow as tf
 
+import os
+from os import walk
+from os.path import join
+
 flags = tf.flags
 
 FLAGS = flags.FLAGS
@@ -412,8 +416,14 @@ def main(_):
       vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
 
   input_files = []
-  for input_pattern in FLAGS.input_file.split(","):
-    input_files.extend(tf.gfile.Glob(input_pattern))
+  if os.path.isdir(FLAGS.input_file): # 若是資料集，則巡迴所有絕對路徑
+    for root, dirs, files in walk(FLAGS.input_file):
+      for f in files:
+        fullpath = join(root, f)
+        input_files.extend(tf.gfile.Glob(fullpath))
+  else: # 否則按照原code
+    for input_pattern in FLAGS.input_file.split(","):
+      input_files.extend(tf.gfile.Glob(input_pattern))
 
   tf.logging.info("*** Reading from input files ***")
   for input_file in input_files:
