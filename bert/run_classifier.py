@@ -194,7 +194,7 @@ class XnliProcessor(DataProcessor):
   def get_train_examples(self, data_dir):
     """See base class."""
     lines = self._read_tsv(
-        os.path.join(data_dir, "multinli",
+        os.path.join(data_dir, "XNLI-1.0", "multinli",
                      "multinli.train.%s.tsv" % self.language))
     examples = []
     for (i, line) in enumerate(lines):
@@ -212,7 +212,7 @@ class XnliProcessor(DataProcessor):
 
   def get_dev_examples(self, data_dir):
     """See base class."""
-    lines = self._read_tsv(os.path.join(data_dir, "xnli.dev.tsv"))
+    lines = self._read_tsv(os.path.join(data_dir, "XNLI-MT-1.0", "xnli.dev.tsv"))
     examples = []
     for (i, line) in enumerate(lines):
       if i == 0:
