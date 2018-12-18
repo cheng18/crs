@@ -24,10 +24,6 @@ import random
 import tokenization
 import tensorflow as tf
 
-import os
-from os import walk
-from os.path import join
-
 flags = tf.flags
 
 FLAGS = flags.FLAGS

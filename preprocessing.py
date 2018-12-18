@@ -1,7 +1,11 @@
 import opencc
+import 
 
 f = open("/crs/wiki_00", 'r')
 
+# import os
+# from os import walk
+# from os.path import join
 #   input_files = []
 #   if os.path.isdir(FLAGS.input_file): # 若是資料集，則巡迴所有絕對路徑
 #     for root, dirs, files in walk(FLAGS.input_file):
