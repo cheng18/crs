@@ -75,7 +75,7 @@ def main(_):
         if is_non_content(line):
           continue
         line = opencc.convert(line, config="t2s.json")
-        line = extract_chinese(line)
+        # line = extract_chinese(line)
         lines.append(line)
         
   output_files = FLAGS.output_file.split(",")
