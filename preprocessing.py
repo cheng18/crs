@@ -51,7 +51,7 @@ def extract_chinese(line):
     for char in line:
       cp = ord(char)
       if is_chinese_char(cp):
-        output.append(cp)
+        output.append(char)
     return "".join(output)
 
 def main(_):
