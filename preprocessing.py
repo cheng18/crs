@@ -84,7 +84,7 @@ def main(_):
     tf.logging.info("  %s", output_file)
 
   with tf.gfile.GFile(output_file, "w") as writer:
-      writer.write('\n'.join(lines))
+      writer.write(''.join(lines))
 
 if __name__ == "__main__":
   flags.mark_flag_as_required("input_file")
