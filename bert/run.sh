@@ -1,11 +1,11 @@
-script /crs/bert/log.txt
+# script /crs/bert/log.txt
 
 export CUDA_VISIBLE_DEVICES=1
 export BERT_BASE_DIR=/crs/bert/chinese_L-12_H-768_A-12__AA_t
 export XNLI_DIR=/crs/downstream_data/XNLI
 
-time python3 create_pretraining_data.py \
-  --input_file=/crs/pre-training_data/zhwiki-20181101-pages-articles/AA/* \
+python3 create_pretraining_data.py \
+  --input_file=/crs/pre-training_data/zhwiki_AA \
   --output_file=$BERT_BASE_DIR/tmp/tf_zh_AA.tfrecord \
   --vocab_file=$BERT_BASE_DIR/vocab.txt \
   --do_lower_case=True \
@@ -15,7 +15,7 @@ time python3 create_pretraining_data.py \
   --random_seed=12345 \
   --dupe_factor=5
 
-time python3 run_pretraining.py \
+python3 run_pretraining.py \
   --input_file=$BERT_BASE_DIR/tmp/tf_zh_AA.tfrecord \
   --output_dir=$BERT_BASE_DIR/bert_model.ckpt \
   --do_train=True \
@@ -28,7 +28,7 @@ time python3 run_pretraining.py \
   --num_warmup_steps=10000 \
   --learning_rate=1e-4
 
-time python3 run_classifier.py \
+python3 run_classifier.py \
   --task_name=XNLI \
   --do_train=true \
   --do_eval=true \
@@ -42,4 +42,4 @@ time python3 run_classifier.py \
   --num_train_epochs=2.0 \
   --output_dir=$BERT_BASE_DIR/tmp/xnli_output/
 
-exit
+# exit

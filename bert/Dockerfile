@@ -75,4 +75,10 @@ COPY bashrc /etc/bash.bashrc
 RUN chmod a+rwx /etc/bash.bashrc
 
 # Add by Winfred
-RUN apt-get install vim -y
+RUN apt-get update && apt-get install vim -y
+RUN apt-get update && apt-get install git -y
+# OpenCC
+RUN apt-get update && apt-get install python make cmake gcc g++ doxygen -y
+RUN git clone https://github.com/BYVoid/OpenCC.git
+RUN cd /OpenCC && make && make install
+RUN ${PIP} install OpenCC

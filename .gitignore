@@ -3,4 +3,11 @@ pre-training_data/
 downstream_data/
 
 # model
-bert/chinese_L-12_H-768_A-12/
+bert/model/
+
+# docker
+.Dockerfile.swo
+.Dockerfile.swp
+
+# log
+log.txt
