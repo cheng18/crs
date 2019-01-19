@@ -5,6 +5,9 @@ downstream_data/
 # model
 bert/model/
 
+# vocab
+vocab/
+
 # docker
 .Dockerfile.swo
 .Dockerfile.swp
