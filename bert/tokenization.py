@@ -139,7 +139,8 @@ class FullTokenizer(object):
     self.do_stroke = do_stroke
     if self.do_stroke:
       self.stroke_vocab = load_stroke_vocab(stroke_vocab_file)
-      self.stroke_tokenizer = StrokeTokenizer(self.stroke_vocab) # end
+      self.stroke_tokenizer = StrokeTokenizer(stroke_vocab=self.stroke_vocab) 
+    # end
 
   def tokenize(self, text):
     split_tokens = []
@@ -149,8 +150,9 @@ class FullTokenizer(object):
 
         # add by winfred
         if self.do_stroke: 
-          for stroke in self.stroke_tokenizer(sub_token):
-            split_tokens.append(stroke) # end
+          for stroke in self.stroke_tokenizer.tokenize(sub_token):
+            split_tokens.append(stroke) 
+        # end
 
     return split_tokens
 
