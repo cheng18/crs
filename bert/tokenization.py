@@ -22,6 +22,7 @@ import collections
 import unicodedata
 import six
 import tensorflow as tf
+import csv # add by winfred
 
 
 def convert_to_unicode(text):
@@ -82,6 +83,23 @@ def load_vocab(vocab_file):
   return vocab
 
 
+# add by winfred
+def load_stroke_vocab(stroke_vocab_file):
+  """Loads a stroke vocabulary file into a dictionary."""
+  with open(stroke_vocab_file, newline="", encoding="utf8") as csvfile:
+    reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+    header = next(reader)
+    char_index = header.index("汉字")
+    stroke_index = header.index("笔顺")
+
+    stroke_vocab = {}
+    for row in reader:
+      stroke_vocab[row[char_index]] = row[stroke_index]
+
+  return stroke_vocab
+# end
+
+
 def convert_by_vocab(vocab, items):
   """Converts a sequence of [tokens|ids] using the vocab."""
   output = []
@@ -110,17 +128,29 @@ def whitespace_tokenize(text):
 class FullTokenizer(object):
   """Runs end-to-end tokenziation."""
 
-  def __init__(self, vocab_file, do_lower_case=True):
+  def __init__(self, vocab_file, do_lower_case=True, 
+               do_stroke=False, stroke_vocab_file=None): # add by winfred
     self.vocab = load_vocab(vocab_file)
     self.inv_vocab = {v: k for k, v in self.vocab.items()}
     self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
     self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
+
+    # add by winfred
+    self.do_stroke = do_stroke
+    if self.do_stroke:
+      self.stroke_vocab = load_stroke_vocab(stroke_vocab_file)
+      self.stroke_tokenizer = StrokeTokenizer(self.stroke_vocab) # end
 
   def tokenize(self, text):
     split_tokens = []
     for token in self.basic_tokenizer.tokenize(text):
       for sub_token in self.wordpiece_tokenizer.tokenize(token):
         split_tokens.append(sub_token)
+
+        # add by winfred
+        if self.do_stroke: 
+          for stroke in self.stroke_tokenizer(sub_token):
+            split_tokens.append(stroke) # end
 
     return split_tokens
 
@@ -306,6 +336,40 @@ class WordpieceTokenizer(object):
       else:
         output_tokens.extend(sub_tokens)
     return output_tokens
+
+
+# add by winfred
+class StrokeTokenizer(object):
+  """Runs Stroke tokenziation."""
+
+  def __init__(self, stroke_vocab):
+    self.stroke_vocab = stroke_vocab
+
+  def tokenize(self, token):
+    """Tokenizes a chinese character to storkes.
+    筆畫有五種：[1, 2, 3, 4, 5]，將以 "###筆畫" 命名 token 來區別。
+
+    For example:
+      input = "天"
+      output = ["###1", "###1", "###3", "###4"]
+
+    Args:
+      token: A single token. 
+
+    Returns:
+      A list of stroke tokens.
+    """
+
+    token = convert_to_unicode(token)
+
+    strokes = []
+    if token in self.stroke_vocab:
+      strokes = self.stroke_vocab[token]
+      strokes = map(lambda s: "###" + s, strokes)
+      strokes = list(strokes)
+    
+    return strokes
+# end
 
 
 def _is_whitespace(char):
