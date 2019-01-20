@@ -61,6 +61,15 @@ flags.DEFINE_bool(
     "Whether to lower case the input text. Should be True for uncased "
     "models and False for cased models.")
 
+# add by winfred
+flags.DEFINE_bool(
+    "do_stroke", False,
+    "中文字使用筆畫來 tokenize 。")
+
+flags.DEFINE_string("stroke_vocab_file", None,
+                    "stroke.csv")
+# end
+
 flags.DEFINE_integer(
     "max_seq_length", 128,
     "The maximum total input sequence length after WordPiece tokenization. "
@@ -772,7 +781,8 @@ def main(_):
   label_list = processor.get_labels()
 
   tokenizer = tokenization.FullTokenizer(
-      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
+      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case,
+      do_stroke=FLAGS.do_stroke, stroke_vocab_file=FLAGS.stroke_vocab_file) # add by winfred
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
