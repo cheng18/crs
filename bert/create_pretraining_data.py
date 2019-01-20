@@ -43,9 +43,14 @@ flags.DEFINE_bool(
     "Whether to lower case the input text. Should be True for uncased "
     "models and False for cased models.")
 
+# add by winfred
 flags.DEFINE_bool(
     "do_stroke", False,
     "中文字使用筆畫來 tokenize 。")
+
+flags.DEFINE_string("stroke_vocab_file", None,
+                    "stroke.csv")
+# end
 
 flags.DEFINE_integer("max_seq_length", 128, "Maximum sequence length.")
 
@@ -414,7 +419,7 @@ def main(_):
 
   tokenizer = tokenization.FullTokenizer(
       vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case,
-      do_stroke=FLAGS.do_stroke)
+      do_stroke=FLAGS.do_stroke, stroke_vocab_file=FLAGS.stroke_vocab_file) # add by winfred
 
   input_files = []
   for input_pattern in FLAGS.input_file.split(","):
