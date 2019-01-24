@@ -46,10 +46,10 @@ flags.DEFINE_bool(
 # add by winfred
 flags.DEFINE_bool(
     "do_stroke", False,
-    "中文字使用筆畫來 tokenize 。")
+    "[Optional] 中文字是否使用筆畫來 tokenize 。")
 
 flags.DEFINE_string("stroke_vocab_file", None,
-                    "stroke.csv")
+                    "[Optional] stroke.csv")
 # end
 
 flags.DEFINE_integer("max_seq_length", 128, "Maximum sequence length.")
