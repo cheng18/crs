@@ -165,7 +165,7 @@ class BertModel(object):
     seq_length = input_shape[1]
 
     # Add by Winfred
-    if input_stroke_ids:
+    if input_stroke_ids is not None:
       input_stroke_shape = get_shape_list(input_stroke_ids, expected_rank=2)
       stroke_length = input_stroke_shape[1] / seq_length
       input_stroke_ids = tf.reshape(input_stroke_ids,
