@@ -105,10 +105,20 @@ flags.DEFINE_integer(
     "num_tpu_cores", 8,
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
+# add by winfred
+flags.DEFINE_bool(
+    "do_stroke_cnn", False,
+    "[Optional] ")
+
+flags.DEFINE_integer(
+    "max_stroke_length", 32,
+    "[Optional] ")
+# end
 
 def model_fn_builder(bert_config, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
-                     use_one_hot_embeddings):
+                     use_one_hot_embeddings, 
+                     do_stroke_cnn=False): # Add by Winfred
   """Returns `model_fn` closure for TPUEstimator."""
 
   def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -126,12 +136,20 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
     masked_lm_weights = features["masked_lm_weights"]
     next_sentence_labels = features["next_sentence_labels"]
 
+    # Add by Winfred
+    if do_stroke_cnn:
+      input_stroke_ids = features["input_stroke_ids"]
+    else:
+      input_stroke_ids = None
+    # End
+
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
     model = modeling.BertModel(
         config=bert_config,
         is_training=is_training,
         input_ids=input_ids,
+        input_stroke_ids=input_stroke_ids, # Add by Winfred
         input_mask=input_mask,
         token_type_ids=segment_ids,
         use_one_hot_embeddings=use_one_hot_embeddings)
@@ -325,7 +343,9 @@ def input_fn_builder(input_files,
                      max_seq_length,
                      max_predictions_per_seq,
                      is_training,
-                     num_cpu_threads=4):
+                     num_cpu_threads=4,
+                     do_stroke_cnn=False,     # Add by Winfred
+                     max_stroke_length=None): # Add by Winfred
   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
   def input_fn(params):
@@ -348,6 +368,12 @@ def input_fn_builder(input_files,
         "next_sentence_labels":
             tf.FixedLenFeature([1], tf.int64),
     }
+
+    # Add by Winfred
+    if do_stroke_cnn:
+      name_to_features["input_stroke_ids"] = tf.FixedLenFeature(
+          [max_seq_length * max_stroke_length], tf.int64)
+    # End
 
     # For training, we want a lot of parallel reading and shuffling.
     # For eval, we want no shuffling and parallel reading doesn't matter.
@@ -444,7 +470,8 @@ def main(_):
       num_train_steps=FLAGS.num_train_steps,
       num_warmup_steps=FLAGS.num_warmup_steps,
       use_tpu=FLAGS.use_tpu,
-      use_one_hot_embeddings=FLAGS.use_tpu)
+      use_one_hot_embeddings=FLAGS.use_tpu,
+      do_stroke_cnn=FLAGS.do_stroke_cnn) # Add by Winfred
 
   # If TPU is not available, this will fall back to normal Estimator on CPU
   # or GPU.
@@ -462,7 +489,9 @@ def main(_):
         input_files=input_files,
         max_seq_length=FLAGS.max_seq_length,
         max_predictions_per_seq=FLAGS.max_predictions_per_seq,
-        is_training=True)
+        is_training=True,
+        do_stroke_cnn=FLAGS.do_stroke_cnn,
+        max_stroke_length=FLAGS.max_stroke_length) # Add by Winfred
     estimator.train(input_fn=train_input_fn, max_steps=FLAGS.num_train_steps)
 
   if FLAGS.do_eval:
@@ -473,7 +502,9 @@ def main(_):
         input_files=input_files,
         max_seq_length=FLAGS.max_seq_length,
         max_predictions_per_seq=FLAGS.max_predictions_per_seq,
-        is_training=False)
+        is_training=False,
+        do_stroke_cnn=FLAGS.do_stroke_cnn,
+        max_stroke_length=FLAGS.max_stroke_length) # Add by Winfred
 
     result = estimator.evaluate(
         input_fn=eval_input_fn, steps=FLAGS.max_eval_steps)

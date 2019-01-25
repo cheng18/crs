@@ -131,6 +131,7 @@ class BertModel(object):
                config,
                is_training,
                input_ids,
+               input_stroke_ids=None, # Add by Winfred
                input_mask=None,
                token_type_ids=None,
                use_one_hot_embeddings=True,
@@ -163,6 +164,14 @@ class BertModel(object):
     batch_size = input_shape[0]
     seq_length = input_shape[1]
 
+    # Add by Winfred
+    if input_stroke_ids:
+      input_stroke_shape = get_shape_list(input_stroke_ids, expected_rank=2)
+      stroke_length = input_stroke_shape[1] / seq_length
+      input_stroke_ids = tf.reshape(input_stroke_ids,
+          shape=[batch_size, seq_length, stroke_length])
+    # End
+
     if input_mask is None:
       input_mask = tf.ones(shape=[batch_size, seq_length], dtype=tf.int32)
 
@@ -179,6 +188,17 @@ class BertModel(object):
             initializer_range=config.initializer_range,
             word_embedding_name="word_embeddings",
             use_one_hot_embeddings=use_one_hot_embeddings)
+
+        # Add by winfred
+        if input_stroke_ids: # ?
+          self.embedding_output = embedding_stroke_cnn(
+              input_tensor=self.embedding_output,
+              input_stroke_ids=input_stroke_ids,
+              stroke_vocab_size=config.stroke_vocab_size,
+              storke_embedding_size=8,
+              initializer_range=0.02,
+              stroke_embedding_name="stroke_embeddings")
+        # end
 
         # Add positional embeddings and token type embeddings, then layer
         # normalize and perform dropout.
@@ -426,6 +446,72 @@ def embedding_lookup(input_ids,
                       input_shape[0:-1] + [input_shape[-1] * embedding_size])
   return (output, embedding_table)
 
+# add by winfred
+def embedding_stroke_cnn(input_tensor,
+                         input_stroke_ids,
+                         stroke_vocab_size,
+                         storke_embedding_size=8,
+                         initializer_range=0.02,
+                         stroke_embedding_name="stroke_embeddings"):
+  """Looks up strokes embeddings for id tensor 
+     then CNN strokes embeddings into char embedding.
+
+  Args:
+    input_stroke_ids: int32 Tensor of shape 
+      [batch_size, seq_length, stroke_length] containing chars's stroke ids.
+    stroke_size: int. Size of the embedding stroke.
+    embedding_size: int. Width of the word embeddings.
+    initializer_range: float. Embedding initialization range.
+    stroke_embedding_name: string. Name of the embedding table.
+    cnn?
+
+  Returns:
+    float Tensor of shape [batch_size, seq_length, embedding_size].
+  """
+  input_shape = get_shape_list(input_tensor, expected_rank=3)
+  width = input_shape[2]
+
+  output = input_tensor
+
+  input_stroke_shape = get_shape_list(input_stroke_ids, expected_rank=3)
+  stroke_length = input_stroke_shape[2]
+
+  embedding_table = tf.get_variable(
+      name=stroke_embedding_name,
+      shape=[stroke_vocab_size, storke_embedding_size],
+      initializer=create_initializer(initializer_range))
+
+  input_strokes = tf.nn.embedding_lookup(embedding_table, input_stroke_ids)
+
+  window = 3
+
+  with tf.variable_scope("embedding_stroke_cnn"):
+    with tf.variable_scope("cnn"):
+      conv = tf.layers.conv2d(
+          input_strokes,
+          filters=32,
+          kernel_size=[1, window],
+          strides=(1, 1),
+          padding='valid',
+          data_format='channels_last',
+          dilation_rate=(1, 1),
+          activation=tf.nn.relu) # name ?
+      conv = tf.layers.max_pooling2d(
+          conv,
+          pool_size=[1, stroke_length-window+1],
+          strides=[1, 1],
+          padding='valid',
+          data_format='channels_last') # name ?
+    conv = tf.squeeze(conv, axis=[2])
+    with tf.variable_scope("output"):
+      cnn_output = tf.layers.dense(
+          conv,
+          width)
+
+  output += cnn_output
+  
+  return output
+# end
 
 def embedding_postprocessor(input_tensor,
                             use_token_type=False,

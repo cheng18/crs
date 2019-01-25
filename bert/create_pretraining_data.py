@@ -43,14 +43,22 @@ flags.DEFINE_bool(
     "Whether to lower case the input text. Should be True for uncased "
     "models and False for cased models.")
 
-# add by winfred
+# Add by Winfred
 flags.DEFINE_bool(
-    "do_stroke", False,
+    "do_stroke_tokenize", False,
     "[Optional] 中文字是否使用筆畫來 tokenize 。")
+
+flags.DEFINE_bool(
+    "do_stroke_cnn", False,
+    "[Optional] ")
+
+flags.DEFINE_integer(
+    "max_stroke_length", 32,
+    "[Optional] ")
 
 flags.DEFINE_string("stroke_vocab_file", None,
                     "[Optional] stroke.csv")
-# end
+# End
 
 flags.DEFINE_integer("max_seq_length", 128, "Maximum sequence length.")
 
@@ -100,7 +108,8 @@ class TrainingInstance(object):
 
 
 def write_instance_to_example_files(instances, tokenizer, max_seq_length,
-                                    max_predictions_per_seq, output_files):
+                                    max_predictions_per_seq, output_files,
+                                    do_stroke_cnn=False, max_stroke_length=None): # Add by Winfred
   """Create TF example files from `TrainingInstance`s."""
   writers = []
   for output_file in output_files:
@@ -113,6 +122,12 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     input_ids = tokenizer.convert_tokens_to_ids(instance.tokens)
     input_mask = [1] * len(input_ids)
     segment_ids = list(instance.segment_ids)
+    # Add by Winfred
+    if do_stroke_cnn:
+      input_stroke_ids = tokenizer.convert_tokens_to_stroke_ids(
+          tokens=instance.tokens,
+          max_stroke_length=max_stroke_length)
+    # End
     assert len(input_ids) <= max_seq_length
 
     while len(input_ids) < max_seq_length:
@@ -143,6 +158,10 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     features["masked_lm_ids"] = create_int_feature(masked_lm_ids)
     features["masked_lm_weights"] = create_float_feature(masked_lm_weights)
     features["next_sentence_labels"] = create_int_feature([next_sentence_label])
+    # Add by Winfred
+    if do_stroke_cnn:
+      features["input_stroke_ids"] = create_int_feature(input_stroke_ids)
+    # End
 
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
 
@@ -418,8 +437,10 @@ def main(_):
   tf.logging.set_verbosity(tf.logging.INFO)
 
   tokenizer = tokenization.FullTokenizer(
-      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case,
-      do_stroke=FLAGS.do_stroke, stroke_vocab_file=FLAGS.stroke_vocab_file) # add by winfred
+      vocab_file=FLAGS.vocab_file, 
+      do_lower_case=FLAGS.do_lower_case,
+      do_stroke_tokenize=FLAGS.do_stroke_tokenize,  # add by winfred
+      stroke_vocab_file=FLAGS.stroke_vocab_file)    # add by winfred
 
   input_files = []
   for input_pattern in FLAGS.input_file.split(","):
@@ -441,7 +462,9 @@ def main(_):
     tf.logging.info("  %s", output_file)
 
   write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
-                                  FLAGS.max_predictions_per_seq, output_files)
+                                  FLAGS.max_predictions_per_seq, output_files,
+                                  do_stroke_cnn=FLAGS.do_stroke_cnn,         # Add by Winfred
+                                  max_stroke_length=FLAGS.max_stroke_length) # Add by Winfred
 
 
 if __name__ == "__main__":

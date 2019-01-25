@@ -129,15 +129,15 @@ class FullTokenizer(object):
   """Runs end-to-end tokenziation."""
 
   def __init__(self, vocab_file, do_lower_case=True, 
-               do_stroke=False, stroke_vocab_file=None): # add by winfred
+               do_stroke_tokenize=False, stroke_vocab_file=None): # add by winfred
     self.vocab = load_vocab(vocab_file)
     self.inv_vocab = {v: k for k, v in self.vocab.items()}
     self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
     self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab)
 
     # add by winfred
-    self.do_stroke = do_stroke
-    if self.do_stroke:
+    self.do_stroke_tokenize = do_stroke_tokenize
+    if stroke_vocab_file:
       self.stroke_vocab = load_stroke_vocab(stroke_vocab_file)
       self.stroke_tokenizer = StrokeTokenizer(stroke_vocab=self.stroke_vocab) 
     # end
@@ -148,11 +148,11 @@ class FullTokenizer(object):
       for sub_token in self.wordpiece_tokenizer.tokenize(token):
         split_tokens.append(sub_token)
 
-        # add by winfred
-        if self.do_stroke: 
+        # Add by winfred
+        if self.do_stroke_tokenize: 
           for stroke in self.stroke_tokenizer.tokenize(sub_token):
             split_tokens.append(stroke) 
-        # end
+        # End
 
     return split_tokens
 
@@ -161,6 +161,13 @@ class FullTokenizer(object):
 
   def convert_ids_to_tokens(self, ids):
     return convert_by_vocab(self.inv_vocab, ids)
+  
+  # Add by Winfred
+  def convert_tokens_to_stroke_ids(self, tokens, max_stroke_length):
+    return self.stroke_tokenizer.convert_tokens_to_stroke_ids(
+        tokens=tokens, 
+        max_stroke_length=max_stroke_length)
+  # End
 
 
 class BasicTokenizer(object):
@@ -371,6 +378,18 @@ class StrokeTokenizer(object):
       strokes = list(strokes)
     
     return strokes
+
+  def convert_tokens_to_stroke_ids(self, tokens, max_stroke_length=32): # model 用
+    output = []
+    for token in tokens:
+      strokes = []
+      if token in self.stroke_vocab:
+        strokes = self.stroke_vocab[token]
+        strokes = list(strokes)[:max_stroke_length]
+      while len(strokes) < max_stroke_length:
+        strokes.append(0)
+      output.extend(strokes)
+    return output
 # end
 
 
