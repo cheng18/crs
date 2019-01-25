@@ -420,11 +420,11 @@ def _decode_record(record, name_to_features):
 
   # tf.Example only supports tf.int64, but the TPU only supports tf.int32.
   # So cast all int64 to int32.
-  # for name in list(example.keys()):
-  #   t = example[name]
-  #   if t.dtype == tf.int64:
-  #     t = tf.to_int32(t)
-  #   example[name] = t
+  for name in list(example.keys()):
+    t = example[name]
+    if t.dtype == tf.int64:
+      t = tf.to_int32(t)
+    example[name] = t
 
   return example
 
