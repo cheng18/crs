@@ -122,12 +122,6 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     input_ids = tokenizer.convert_tokens_to_ids(instance.tokens)
     input_mask = [1] * len(input_ids)
     segment_ids = list(instance.segment_ids)
-    # Add by Winfred
-    if do_stroke_cnn:
-      input_stroke_ids = tokenizer.convert_tokens_to_stroke_ids(
-          tokens=instance.tokens,
-          max_stroke_length=max_stroke_length)
-    # End
     assert len(input_ids) <= max_seq_length
 
     while len(input_ids) < max_seq_length:
@@ -138,6 +132,18 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
+
+    # Add by Winfred
+    if do_stroke_cnn:
+      input_stroke_ids = tokenizer.convert_tokens_to_stroke_ids(
+          tokens=instance.tokens,
+          max_stroke_length=max_stroke_length)
+
+    while len(input_stroke_ids) < (max_seq_length * max_stroke_length):
+      input_stroke_ids.append(0)
+
+    assert len(input_stroke_ids) == (max_seq_length * max_stroke_length)
+    # End
 
     masked_lm_positions = list(instance.masked_lm_positions)
     masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)
