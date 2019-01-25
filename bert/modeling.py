@@ -190,7 +190,7 @@ class BertModel(object):
             use_one_hot_embeddings=use_one_hot_embeddings)
 
         # Add by winfred
-        if input_stroke_ids: # ?
+        if input_stroke_ids is not None: # ?
           self.embedding_output = embedding_stroke_cnn(
               input_tensor=self.embedding_output,
               input_stroke_ids=input_stroke_ids,
