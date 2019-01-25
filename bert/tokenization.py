@@ -386,6 +386,7 @@ class StrokeTokenizer(object):
       if token in self.stroke_vocab:
         strokes = self.stroke_vocab[token]
         strokes = list(strokes)[:max_stroke_length]
+        strokes = list(map(int, strokes))
       while len(strokes) < max_stroke_length:
         strokes.append(0)
       output.extend(strokes)
