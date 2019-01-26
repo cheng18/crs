@@ -197,7 +197,8 @@ class BertModel(object):
               stroke_vocab_size=config.stroke_vocab_size,
               storke_embedding_size=8,
               initializer_range=0.02,
-              stroke_embedding_name="stroke_embeddings")
+              stroke_embedding_name="stroke_embeddings",
+              dropout_prob=config.hidden_dropout_prob)
         # end
 
         # Add positional embeddings and token type embeddings, then layer
@@ -452,7 +453,8 @@ def embedding_stroke_cnn(input_tensor,
                          stroke_vocab_size,
                          storke_embedding_size=8,
                          initializer_range=0.02,
-                         stroke_embedding_name="stroke_embeddings"):
+                         stroke_embedding_name="stroke_embeddings",
+                         dropout_prob=0.1):
   """Looks up strokes embeddings for id tensor 
      then CNN strokes embeddings into char embedding.
 
@@ -483,7 +485,7 @@ def embedding_stroke_cnn(input_tensor,
 
   input_strokes = tf.nn.embedding_lookup(embedding_table, input_stroke_ids)
 
-  window = 3
+  window = 4
 
   with tf.variable_scope("embedding_stroke_cnn"):
     with tf.variable_scope("cnn"):
@@ -495,7 +497,8 @@ def embedding_stroke_cnn(input_tensor,
           padding='valid',
           data_format='channels_last',
           dilation_rate=(1, 1),
-          activation=tf.nn.relu) # name ?
+          activation=tf.nn.relu,
+          kernel_initializer=create_initializer(initializer_range)) # name ?
       conv = tf.layers.max_pooling2d(
           conv,
           pool_size=[1, stroke_length-window+1],
@@ -505,10 +508,12 @@ def embedding_stroke_cnn(input_tensor,
     conv = tf.squeeze(conv, axis=[2])
     with tf.variable_scope("output"):
       cnn_output = tf.layers.dense(
-          conv,
-          width)
+          inputs=conv,
+          units=width,
+          activation=tf.nn.relu,
+          kernel_initializer=create_initializer(initializer_range))
 
-  output += cnn_output
+  output += layer_norm_and_dropout(cnn_output, dropout_prob)
   
   return output
 # end
