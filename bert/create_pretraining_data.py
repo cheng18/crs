@@ -139,10 +139,10 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
           tokens=instance.tokens,
           max_stroke_length=max_stroke_length)
 
-    while len(input_stroke_ids) < (max_seq_length * max_stroke_length):
-      input_stroke_ids.append(0)
+      while len(input_stroke_ids) < (max_seq_length * max_stroke_length):
+        input_stroke_ids.append(0)
 
-    assert len(input_stroke_ids) == (max_seq_length * max_stroke_length)
+      assert len(input_stroke_ids) == (max_seq_length * max_stroke_length)
     # End
 
     masked_lm_positions = list(instance.masked_lm_positions)
