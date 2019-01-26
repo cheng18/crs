@@ -514,7 +514,7 @@ def file_based_convert_examples_to_features(
     # Add by Winfred
     if do_stroke_cnn:
       features["input_stroke_ids"] = create_int_feature(
-          [feature.input_stroke_ids])
+          feature.input_stroke_ids)
     # End
 
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
