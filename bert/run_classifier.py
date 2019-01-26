@@ -61,15 +61,6 @@ flags.DEFINE_bool(
     "Whether to lower case the input text. Should be True for uncased "
     "models and False for cased models.")
 
-# add by winfred
-flags.DEFINE_bool(
-    "do_stroke", False,
-    "[Optional] 中文字是否使用筆畫來 tokenize 。")
-
-flags.DEFINE_string("stroke_vocab_file", None,
-                    "[Optional] stroke.csv")
-# end
-
 flags.DEFINE_integer(
     "max_seq_length", 128,
     "The maximum total input sequence length after WordPiece tokenization. "
@@ -132,6 +123,22 @@ flags.DEFINE_integer(
     "num_tpu_cores", 8,
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
+# Add by Winfred
+flags.DEFINE_bool(
+    "do_stroke_tokenize", False,
+    "[Optional] 中文字是否使用筆畫來 tokenize 。")
+
+flags.DEFINE_bool(
+    "do_stroke_cnn", False,
+    "[Optional] ")
+
+flags.DEFINE_integer(
+    "max_stroke_length", 32,
+    "[Optional] ")
+
+flags.DEFINE_string("stroke_vocab_file", None,
+                    "[Optional] stroke.csv")
+# End
 
 class InputExample(object):
   """A single training/test example for simple sequence classification."""
@@ -157,11 +164,13 @@ class InputExample(object):
 class InputFeatures(object):
   """A single set of features of data."""
 
-  def __init__(self, input_ids, input_mask, segment_ids, label_id):
+  def __init__(self, input_ids, input_mask, segment_ids, label_id,
+               input_stroke_ids=None): # Add by Winfred
     self.input_ids = input_ids
     self.input_mask = input_mask
     self.segment_ids = segment_ids
     self.label_id = label_id
+    self.input_stroke_ids=input_stroke_ids # Add by Winfred
 
 
 class DataProcessor(object):
@@ -365,7 +374,9 @@ class ColaProcessor(DataProcessor):
 
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
-                           tokenizer):
+                           tokenizer, 
+                           do_stroke_cnn=False,     # Add by Winfred
+                           max_stroke_length=None): # Add by Winfred
   """Converts a single `InputExample` into a single `InputFeatures`."""
   label_map = {}
   for (i, label) in enumerate(label_list):
@@ -437,6 +448,19 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
   assert len(input_mask) == max_seq_length
   assert len(segment_ids) == max_seq_length
 
+  # Add by Winfred
+  input_stroke_ids = None
+  if do_stroke_cnn:
+    input_stroke_ids = tokenizer.convert_tokens_to_stroke_ids(
+        tokens=tokens,
+        max_stroke_length=max_stroke_length)
+
+    while len(input_stroke_ids) < (max_seq_length * max_stroke_length):
+      input_stroke_ids.append(0)
+
+    assert len(input_stroke_ids) == (max_seq_length * max_stroke_length)
+  # End
+
   label_id = label_map[example.label]
   if ex_index < 5:
     tf.logging.info("*** Example ***")
@@ -447,17 +471,24 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
     tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
     tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
     tf.logging.info("label: %s (id = %d)" % (example.label, label_id))
+    # Add by Winfred
+    if do_stroke_cnn:
+      tf.logging.info("input_stroke_ids: %s" % " ".join(
+          [str(x) for x in input_stroke_ids]))
+    # End
 
   feature = InputFeatures(
       input_ids=input_ids,
       input_mask=input_mask,
       segment_ids=segment_ids,
-      label_id=label_id)
+      label_id=label_id,
+      input_stroke_ids=input_stroke_ids) # Add by Winfred
   return feature
 
 
 def file_based_convert_examples_to_features(
-    examples, label_list, max_seq_length, tokenizer, output_file):
+    examples, label_list, max_seq_length, tokenizer, output_file,
+    do_stroke_cnn, max_stroke_length): # Add by Winfred
   """Convert a set of `InputExample`s to a TFRecord file."""
 
   writer = tf.python_io.TFRecordWriter(output_file)
@@ -467,7 +498,9 @@ def file_based_convert_examples_to_features(
       tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
 
     feature = convert_single_example(ex_index, example, label_list,
-                                     max_seq_length, tokenizer)
+                                     max_seq_length, tokenizer,
+                                     do_stroke_cnn, # Add by Winfred
+                                     max_stroke_length) # Add by Winfred
 
     def create_int_feature(values):
       f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -478,13 +511,19 @@ def file_based_convert_examples_to_features(
     features["input_mask"] = create_int_feature(feature.input_mask)
     features["segment_ids"] = create_int_feature(feature.segment_ids)
     features["label_ids"] = create_int_feature([feature.label_id])
+    # Add by Winfred
+    if do_stroke_cnn:
+      features["input_stroke_ids"] = create_int_feature(
+          [feature.input_stroke_ids])
+    # End
 
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
     writer.write(tf_example.SerializeToString())
 
 
 def file_based_input_fn_builder(input_file, seq_length, is_training,
-                                drop_remainder):
+                                drop_remainder,
+                                do_stroke_cnn, stroke_length): # Add by Winfred
   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
   name_to_features = {
@@ -493,6 +532,12 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
       "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
       "label_ids": tf.FixedLenFeature([], tf.int64),
   }
+  # Add by Winfred
+  if do_stroke_cnn:
+    name_to_features["input_stroke_ids"] = tf.FixedLenFeature(
+        [seq_length * stroke_length], tf.int64)
+  # End
+
 
   def _decode_record(record, name_to_features):
     """Decodes a record to a TensorFlow example."""
@@ -548,12 +593,14 @@ def _truncate_seq_pair(tokens_a, tokens_b, max_length):
 
 
 def create_model(bert_config, is_training, input_ids, input_mask, segment_ids,
-                 labels, num_labels, use_one_hot_embeddings):
+                 labels, num_labels, use_one_hot_embeddings,
+                 input_stroke_ids): # Add by Winfred
   """Creates a classification model."""
   model = modeling.BertModel(
       config=bert_config,
       is_training=is_training,
       input_ids=input_ids,
+      input_stroke_ids=input_stroke_ids, # Add by Winfred
       input_mask=input_mask,
       token_type_ids=segment_ids,
       use_one_hot_embeddings=use_one_hot_embeddings)
@@ -609,11 +656,18 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
     segment_ids = features["segment_ids"]
     label_ids = features["label_ids"]
 
+    # Add by Winfred
+    input_stroke_ids = None
+    if "input_stroke_ids" in features.keys():
+      input_stroke_ids = features["input_stroke_ids"]
+    # End
+
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
     (total_loss, per_example_loss, logits, probabilities) = create_model(
         bert_config, is_training, input_ids, input_mask, segment_ids, label_ids,
-        num_labels, use_one_hot_embeddings)
+        num_labels, use_one_hot_embeddings,
+        input_stroke_ids) # Add by Winfred
 
     tvars = tf.trainable_variables()
     initialized_variable_names = {}
@@ -781,8 +835,10 @@ def main(_):
   label_list = processor.get_labels()
 
   tokenizer = tokenization.FullTokenizer(
-      vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case,
-      do_stroke=FLAGS.do_stroke, stroke_vocab_file=FLAGS.stroke_vocab_file) # add by winfred
+      vocab_file=FLAGS.vocab_file, 
+      do_lower_case=FLAGS.do_lower_case,
+      do_stroke_tokenize=FLAGS.do_stroke_tokenize, # add by Winfred
+      stroke_vocab_file=FLAGS.stroke_vocab_file)   # add by Winfred
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
@@ -832,7 +888,8 @@ def main(_):
   if FLAGS.do_train:
     train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
     file_based_convert_examples_to_features(
-        train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
+        train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file,
+        FLAGS.do_stroke_cnn, FLAGS.max_stroke_length) # Add by Winfred
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", len(train_examples))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
@@ -841,14 +898,17 @@ def main(_):
         input_file=train_file,
         seq_length=FLAGS.max_seq_length,
         is_training=True,
-        drop_remainder=True)
+        drop_remainder=True,
+        do_stroke_cnn=FLAGS.do_stroke_cnn,     # Add by Winfred
+        stroke_length=FLAGS.max_stroke_length) # Add by Winfred
     estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
   if FLAGS.do_eval:
     eval_examples = processor.get_dev_examples(FLAGS.data_dir)
     eval_file = os.path.join(FLAGS.output_dir, "eval.tf_record")
     file_based_convert_examples_to_features(
-        eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file)
+        eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file,
+        FLAGS.do_stroke_cnn, FLAGS.max_stroke_length) # Add by Winfred
 
     tf.logging.info("***** Running evaluation *****")
     tf.logging.info("  Num examples = %d", len(eval_examples))
@@ -868,7 +928,9 @@ def main(_):
         input_file=eval_file,
         seq_length=FLAGS.max_seq_length,
         is_training=False,
-        drop_remainder=eval_drop_remainder)
+        drop_remainder=eval_drop_remainder,
+        do_stroke_cnn=FLAGS.do_stroke_cnn,     # Add by Winfred
+        stroke_length=FLAGS.max_stroke_length) # Add by Winfred
 
     result = estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
@@ -884,7 +946,9 @@ def main(_):
     predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
     file_based_convert_examples_to_features(predict_examples, label_list,
                                             FLAGS.max_seq_length, tokenizer,
-                                            predict_file)
+                                            predict_file,
+                                            FLAGS.do_stroke_cnn, # Add by Winfred
+                                            FLAGS.max_stroke_length) # Add by Winfred
 
     tf.logging.info("***** Running prediction*****")
     tf.logging.info("  Num examples = %d", len(predict_examples))
@@ -900,7 +964,9 @@ def main(_):
         input_file=predict_file,
         seq_length=FLAGS.max_seq_length,
         is_training=False,
-        drop_remainder=predict_drop_remainder)
+        drop_remainder=predict_drop_remainder,
+        do_stroke_cnn=FLAGS.do_stroke_cnn,     # Add by Winfred
+        stroke_length=FLAGS.max_stroke_length) # Add by Winfred
 
     result = estimator.predict(input_fn=predict_input_fn)
 
