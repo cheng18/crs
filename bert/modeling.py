@@ -514,7 +514,7 @@ def embedding_stroke_cnn(input_tensor,
           kernel_initializer=create_initializer(initializer_range))
 
   # output += layer_norm_and_dropout(cnn_output, dropout_prob)
-  output = cnn_output
+  output = layer_norm_and_dropout(cnn_output, dropout_prob)
 
   return output
 # end
