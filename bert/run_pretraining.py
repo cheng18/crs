@@ -196,7 +196,7 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
           total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
       # Add by Winfred
-      logging_hook = tf.train.LoggingTensorHook({"loss: ": total_loss},
+      logging_hook = tf.train.LoggingTensorHook({"loss": total_loss},
           every_n_iter=100)
       # End
 

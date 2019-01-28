@@ -484,28 +484,35 @@ def embedding_stroke_cnn(input_tensor,
       initializer=create_initializer(initializer_range))
 
   input_strokes = tf.nn.embedding_lookup(embedding_table, input_stroke_ids)
+  # input_strokes shape [batch_size, seq_length, stroke_length, embedding]
 
   window = 4
 
   with tf.variable_scope("embedding_stroke_cnn"):
-    with tf.variable_scope("cnn"):
-      conv = tf.layers.conv2d(
-          input_strokes,
-          filters=32,
-          kernel_size=[1, window],
-          strides=(1, 1),
-          padding='valid',
-          data_format='channels_last',
-          dilation_rate=(1, 1),
-          activation=tf.nn.relu,
-          kernel_initializer=create_initializer(initializer_range)) # name ?
-      conv = tf.layers.max_pooling2d(
-          conv,
-          pool_size=[1, stroke_length-window+1],
-          strides=[1, 1],
-          padding='valid',
-          data_format='channels_last') # name ?
-    conv = tf.squeeze(conv, axis=[2])
+    # with tf.variable_scope("cnn"):
+    #   conv = tf.layers.conv2d(
+    #       input_strokes,
+    #       filters=32,
+    #       kernel_size=[1, window],
+    #       strides=(1, 1),
+    #       padding='valid',
+    #       data_format='channels_last',
+    #       dilation_rate=(1, 1),
+    #       activation=tf.nn.relu,
+    #       kernel_initializer=create_initializer(initializer_range)) # name ?
+    #   conv = tf.layers.max_pooling2d(
+    #       conv,
+    #       pool_size=[1, stroke_length-window+1],
+    #       strides=[1, 1],
+    #       padding='valid',
+    #       data_format='channels_last') # name ?
+    # conv shape [batch_size, seq_length, stroke_length, embedding]
+    #
+    # conv = tf.squeeze(conv, axis=[2])
+    # conv shape [batch_size, seq_length, embedding]
+
+    conv = input_strokes
+
     with tf.variable_scope("output"):
       cnn_output = tf.layers.dense(
           inputs=conv,
@@ -514,7 +521,7 @@ def embedding_stroke_cnn(input_tensor,
           kernel_initializer=create_initializer(initializer_range))
 
   # output += layer_norm_and_dropout(cnn_output, dropout_prob)
-  output = layer_norm_and_dropout(cnn_output, dropout_prob)
+  output = cnn_output
 
   return output
 # end
