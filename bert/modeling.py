@@ -195,7 +195,7 @@ class BertModel(object):
               input_tensor=self.embedding_output,
               input_stroke_ids=input_stroke_ids,
               stroke_vocab_size=config.stroke_vocab_size,
-              storke_embedding_size=8,
+              stroke_embedding_size=8,
               initializer_range=0.02,
               stroke_embedding_name="stroke_embeddings",
               dropout_prob=config.hidden_dropout_prob)
@@ -451,7 +451,7 @@ def embedding_lookup(input_ids,
 def embedding_stroke_cnn(input_tensor,
                          input_stroke_ids,
                          stroke_vocab_size,
-                         storke_embedding_size=8,
+                         stroke_embedding_size=8,
                          initializer_range=0.02,
                          stroke_embedding_name="stroke_embeddings",
                          dropout_prob=0.1):
@@ -471,6 +471,8 @@ def embedding_stroke_cnn(input_tensor,
     float Tensor of shape [batch_size, seq_length, embedding_size].
   """
   input_shape = get_shape_list(input_tensor, expected_rank=3)
+  batch_size = input_shape[0]
+  seq_length = input_shape[1]
   width = input_shape[2]
 
   output = input_tensor
@@ -480,7 +482,7 @@ def embedding_stroke_cnn(input_tensor,
 
   embedding_table = tf.get_variable(
       name=stroke_embedding_name,
-      shape=[stroke_vocab_size, storke_embedding_size],
+      shape=[stroke_vocab_size, stroke_embedding_size],
       initializer=create_initializer(initializer_range))
 
   input_strokes = tf.nn.embedding_lookup(embedding_table, input_stroke_ids)
@@ -506,12 +508,16 @@ def embedding_stroke_cnn(input_tensor,
     #       strides=[1, 1],
     #       padding='valid',
     #       data_format='channels_last') # name ?
+    # conv shape [batch_size, seq_length, stroke_length, embedding]
+    # conv = tf.squeeze(conv, axis=[2])
+    # conv shape [batch_size, seq_length, embedding]
 
     conv = input_strokes
 
     # conv shape [batch_size, seq_length, stroke_length, embedding]
-    conv = tf.squeeze(conv, axis=[2])
-    # conv shape [batch_size, seq_length, embedding]
+    conv = tf.reshape(conv, [batch_size, seq_length, 
+                             stroke_length * stroke_embedding_size])
+    # conv shape [batch_size, seq_length, stroke_length * stroke_embedding_size]
 
     with tf.variable_scope("output"):
       cnn_output = tf.layers.dense(
