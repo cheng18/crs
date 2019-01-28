@@ -195,7 +195,7 @@ class BertModel(object):
               input_tensor=self.embedding_output,
               input_stroke_ids=input_stroke_ids,
               stroke_vocab_size=config.stroke_vocab_size,
-              stroke_embedding_size=8,
+              stroke_embedding_size=4,
               initializer_range=0.02,
               stroke_embedding_name="stroke_embeddings",
               dropout_prob=config.hidden_dropout_prob)
@@ -517,14 +517,17 @@ def embedding_stroke_cnn(input_tensor,
     # conv shape [batch_size, seq_length, stroke_length, embedding]
     conv = tf.reshape(conv, [batch_size, seq_length, 
                              stroke_length * stroke_embedding_size])
-    # conv shape [batch_size, seq_length, stroke_length * stroke_embedding_size]
+    # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
 
-    with tf.variable_scope("output"):
-      cnn_output = tf.layers.dense(
-          inputs=conv,
-          units=width,
-          activation=tf.nn.relu,
-          kernel_initializer=create_initializer(initializer_range))
+    # with tf.variable_scope("output"):
+    #   cnn_output = tf.layers.dense(
+    #       inputs=conv,
+    #       units=width,
+    #       activation=tf.nn.relu,
+    #       kernel_initializer=create_initializer(initializer_range))
+
+    cnn_output = conv
+    # cnn_output shape [batch_size, seq_length, width]
 
   # output += layer_norm_and_dropout(cnn_output, dropout_prob)
   output = cnn_output
