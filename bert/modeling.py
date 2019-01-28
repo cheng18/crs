@@ -506,12 +506,12 @@ def embedding_stroke_cnn(input_tensor,
     #       strides=[1, 1],
     #       padding='valid',
     #       data_format='channels_last') # name ?
-    # conv shape [batch_size, seq_length, stroke_length, embedding]
-    #
-    # conv = tf.squeeze(conv, axis=[2])
-    # conv shape [batch_size, seq_length, embedding]
 
     conv = input_strokes
+
+    # conv shape [batch_size, seq_length, stroke_length, embedding]
+    conv = tf.squeeze(conv, axis=[2])
+    # conv shape [batch_size, seq_length, embedding]
 
     with tf.variable_scope("output"):
       cnn_output = tf.layers.dense(
