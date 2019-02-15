@@ -14,3 +14,7 @@ vocab/
 
 # log
 log.txt
+
+# other
+*.xml
+*.iml
