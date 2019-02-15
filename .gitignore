@@ -18,3 +18,4 @@ log.txt
 # other
 *.xml
 *.iml
+*.vscode
