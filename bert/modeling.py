@@ -189,13 +189,13 @@ class BertModel(object):
             word_embedding_name="word_embeddings",
             use_one_hot_embeddings=use_one_hot_embeddings)
 
-        # Add by winfred
+        # Add by Winfred
         if input_stroke_ids is not None: # ?
           self.embedding_output = embedding_stroke_cnn(
               input_tensor=self.embedding_output,
               input_stroke_ids=input_stroke_ids,
               stroke_vocab_size=config.stroke_vocab_size,
-              stroke_embedding_size=8,
+              stroke_embedding_size=24,
               initializer_range=0.02,
               stroke_embedding_name="stroke_embeddings",
               dropout_prob=config.hidden_dropout_prob)
