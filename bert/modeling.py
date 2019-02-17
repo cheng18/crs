@@ -195,7 +195,7 @@ class BertModel(object):
               input_tensor=self.embedding_output,
               input_stroke_ids=input_stroke_ids,
               stroke_vocab_size=config.stroke_vocab_size,
-              stroke_embedding_size=8, # 爲啥不能是 24？
+              stroke_embedding_size=3, # 爲啥不能是 24？
               initializer_range=0.02,
               stroke_embedding_name="stroke_embeddings",
               dropout_prob=config.hidden_dropout_prob)
@@ -488,29 +488,47 @@ def embedding_stroke_cnn(input_tensor,
   input_strokes = tf.nn.embedding_lookup(embedding_table, input_stroke_ids)
   # input_strokes shape [batch_size, seq_length, stroke_length, embedding]
 
-  window = 4
+# ------------------concat-----------------
+  with tf.variable_scope("embedding_stroke_concat"):
 
-  with tf.variable_scope("embedding_stroke_cnn"):
-    with tf.variable_scope("cnn"):
-      conv = tf.layers.conv2d(
-          input_strokes,
-          filters=32,
-          kernel_size=[1, window],
-          strides=(1, 1),
-          padding='valid',
-          data_format='channels_last',
-          dilation_rate=(1, 1),
-          activation=tf.nn.relu,
-          kernel_initializer=create_initializer(initializer_range)) # name ?
-      conv = tf.layers.max_pooling2d(
-          conv,
-          pool_size=[1, stroke_length-window+1],
-          strides=[1, 1],
-          padding='valid',
-          data_format='channels_last') # name ?
     # conv shape [batch_size, seq_length, stroke_length, embedding]
-    conv = tf.squeeze(conv, axis=[2])
-    # conv shape [batch_size, seq_length, embedding]
+    input_strokes = tf.reshape(input_strokes, [batch_size, seq_length, 
+                               stroke_length * stroke_embedding_size])
+    # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
+
+    output = tf.concat([output, input_strokes], 2)
+
+    with tf.variable_scope("output_strokes"):
+      output = tf.layers.dense(
+          inputs=output,
+          units=width,
+          kernel_initializer=create_initializer(initializer_range))
+# ------------------concat-----------------end
+
+# ------------------CNN-----------------
+  # window = 4
+
+  # with tf.variable_scope("embedding_stroke_cnn"):
+    # with tf.variable_scope("cnn"):
+    #   conv = tf.layers.conv2d(
+    #       input_strokes,
+    #       filters=32,
+    #       kernel_size=[1, window],
+    #       strides=(1, 1),
+    #       padding='valid',
+    #       data_format='channels_last',
+    #       dilation_rate=(1, 1),
+    #       activation=tf.nn.relu,
+    #       kernel_initializer=create_initializer(initializer_range)) # name ?
+    #   conv = tf.layers.max_pooling2d(
+    #       conv,
+    #       pool_size=[1, stroke_length-window+1],
+    #       strides=[1, stroke_length-window+1], # ?
+    #       padding='valid',
+    #       data_format='channels_last') # name ?
+    # # conv shape [batch_size, seq_length, stroke_length, embedding]
+    # conv = tf.squeeze(conv, axis=[2])
+    # # conv shape [batch_size, seq_length, embedding]
 
     # conv = input_strokes
 
@@ -519,19 +537,19 @@ def embedding_stroke_cnn(input_tensor,
     #                          stroke_length * stroke_embedding_size])
     # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
 
-    with tf.variable_scope("output"):
-      cnn_output = tf.layers.dense(
-          inputs=conv,
-          units=width,
-          activation=tf.nn.relu,
-          kernel_initializer=create_initializer(initializer_range))
+    # with tf.variable_scope("output"):
+    #   cnn_output = tf.layers.dense(
+    #       inputs=conv,
+    #       units=width,
+    #       activation=tf.nn.relu,
+    #       kernel_initializer=create_initializer(initializer_range))
 
     # cnn_output = conv
     # cnn_output shape [batch_size, seq_length, width]
 
   # output += layer_norm_and_dropout(cnn_output, dropout_prob)
-  output = layer_norm_and_dropout(cnn_output, dropout_prob)
-
+  # output = layer_norm_and_dropout(cnn_output, dropout_prob)
+# ------------------CNN-----------------end
   return output
 # end
 
