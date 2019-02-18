@@ -190,6 +190,13 @@ class BertModel(object):
             use_one_hot_embeddings=use_one_hot_embeddings)
 
         # Add by Winfred
+        #---------------
+        with tf.variable_scope("embedding_dense"):
+          self.embedding_output = tf.layers.dense(
+              inputs=self.embedding_output,
+              units=config.hidden_size,
+              kernel_initializer=create_initializer(config.initializer_range))
+        #---------------end
         if input_stroke_ids is not None: # ?
           self.embedding_output = embedding_stroke_cnn(
               input_tensor=self.embedding_output,
@@ -489,20 +496,20 @@ def embedding_stroke_cnn(input_tensor,
   # input_strokes shape [batch_size, seq_length, stroke_length, embedding]
 
 # ------------------concat-----------------
-  with tf.variable_scope("embedding_stroke_concat"):
+  # with tf.variable_scope("embedding_stroke_concat"):
 
-    # conv shape [batch_size, seq_length, stroke_length, embedding]
-    input_strokes = tf.reshape(input_strokes, [batch_size, seq_length, 
-                               stroke_length * stroke_embedding_size])
-    # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
+    # # conv shape [batch_size, seq_length, stroke_length, embedding]
+    # input_strokes = tf.reshape(input_strokes, [batch_size, seq_length, 
+    #                            stroke_length * stroke_embedding_size])
+    # # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
 
-    output = tf.concat([output, input_strokes], 2)
+    # output = tf.concat([output, input_strokes], 2)
 
-    with tf.variable_scope("output_strokes"):
-      output = tf.layers.dense(
-          inputs=output,
-          units=width,
-          kernel_initializer=create_initializer(initializer_range))
+    # with tf.variable_scope("output_strokes"):
+    #   output = tf.layers.dense(
+    #       inputs=output,
+    #       units=width,
+    #       kernel_initializer=create_initializer(initializer_range))
 # ------------------concat-----------------end
 
 # ------------------CNN-----------------
