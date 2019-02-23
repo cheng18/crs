@@ -190,19 +190,13 @@ class BertModel(object):
             use_one_hot_embeddings=use_one_hot_embeddings)
 
         # Add by Winfred
-        #---------------
-        with tf.variable_scope("embedding_dense"):
-          self.embedding_output = tf.layers.dense(
-              inputs=self.embedding_output,
-              units=config.hidden_size,
-              kernel_initializer=create_initializer(config.initializer_range))
-        #---------------end
         if input_stroke_ids is not None: # ?
           self.embedding_output = embedding_stroke_cnn(
               input_tensor=self.embedding_output,
               input_stroke_ids=input_stroke_ids,
               stroke_vocab_size=config.stroke_vocab_size,
-              stroke_embedding_size=3, # 爲啥不能是 24？
+              stroke_embedding_size=config.stroke_embedding_size,
+              stroke_windows_filters=config.stroke_cnn_windows_filters,
               initializer_range=0.02,
               stroke_embedding_name="stroke_embeddings",
               dropout_prob=config.hidden_dropout_prob)
@@ -458,7 +452,8 @@ def embedding_lookup(input_ids,
 def embedding_stroke_cnn(input_tensor,
                          input_stroke_ids,
                          stroke_vocab_size,
-                         stroke_embedding_size=8,
+                         stroke_embedding_size,
+                         stroke_windows_filters,
                          initializer_range=0.02,
                          stroke_embedding_name="stroke_embeddings",
                          dropout_prob=0.1):
@@ -466,6 +461,7 @@ def embedding_stroke_cnn(input_tensor,
      then CNN strokes embeddings into char embedding.
 
   Args:
+    input_tensor: Tensor of shape [batch_size, seq_length, embedding_size].
     input_stroke_ids: int32 Tensor of shape 
       [batch_size, seq_length, stroke_length] containing chars's stroke ids.
     stroke_size: int. Size of the embedding stroke.
@@ -498,64 +494,103 @@ def embedding_stroke_cnn(input_tensor,
 # ------------------concat-----------------
   # with tf.variable_scope("embedding_stroke_concat"):
 
-    # # conv shape [batch_size, seq_length, stroke_length, embedding]
-    # input_strokes = tf.reshape(input_strokes, [batch_size, seq_length, 
-    #                            stroke_length * stroke_embedding_size])
-    # # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
+  #   # conv shape [batch_size, seq_length, stroke_length, embedding]
+  #   input_strokes = tf.reshape(input_strokes, [batch_size, seq_length, 
+  #                              stroke_length * stroke_embedding_size])
+  #   # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
 
-    # output = tf.concat([output, input_strokes], 2)
+  #   output = tf.concat([output, input_strokes], 2)
 
-    # with tf.variable_scope("output_strokes"):
-    #   output = tf.layers.dense(
-    #       inputs=output,
-    #       units=width,
-    #       kernel_initializer=create_initializer(initializer_range))
+  #   with tf.variable_scope("output_strokes"):
+  #     output = tf.layers.dense(
+  #         inputs=output,
+  #         units=width,
+  #         kernel_initializer=create_initializer(initializer_range))
+
+  #   output = dropout(output, dropout_prob) # 1
 # ------------------concat-----------------end
 
-# ------------------CNN-----------------
-  # window = 4
+# ------------------CNN tf.nn-----------------
 
   # with tf.variable_scope("embedding_stroke_cnn"):
-    # with tf.variable_scope("cnn"):
-    #   conv = tf.layers.conv2d(
-    #       input_strokes,
-    #       filters=32,
-    #       kernel_size=[1, window],
-    #       strides=(1, 1),
-    #       padding='valid',
-    #       data_format='channels_last',
-    #       dilation_rate=(1, 1),
-    #       activation=tf.nn.relu,
-    #       kernel_initializer=create_initializer(initializer_range)) # name ?
-    #   conv = tf.layers.max_pooling2d(
-    #       conv,
-    #       pool_size=[1, stroke_length-window+1],
-    #       strides=[1, stroke_length-window+1], # ?
-    #       padding='valid',
-    #       data_format='channels_last') # name ?
-    # # conv shape [batch_size, seq_length, stroke_length, embedding]
-    # conv = tf.squeeze(conv, axis=[2])
-    # # conv shape [batch_size, seq_length, embedding]
+  #   outputs = []
+  #   for i, (window, filters) in enumerate(stroke_windows_filters):
+  #     with tf.variable_scope("cnn%s" % i):
+  #       w_init = tf.random_uniform_initializer(minval=-0.05, maxval=0.05)
+  #       w = tf.get_variable(
+  #           "W_cnn_%s" % i,
+  #           [1, window, stroke_embedding_size, filters],
+  #           initializer=w_init)
+  #       b = tf.get_variable(
+  #           "b_cnn_%s" % i, 
+  #           [filters], 
+  #           initializer=tf.constant_initializer(0.0))
 
-    # conv = input_strokes
+  #       conv = tf.nn.conv2d(
+  #               input_strokes, 
+  #               w,
+  #               strides=[1, 1, 1, 1],
+  #               padding="VALID") + b
+  #       conv = tf.nn.max_pool(
+  #               conv, 
+  #               [1, 1, stroke_length-window+1, 1],
+  #               [1, 1, 1, 1], 
+  #               'VALID')
+  #       conv = tf.nn.relu(conv)
 
-    # conv shape [batch_size, seq_length, stroke_length, embedding]
-    # conv = tf.reshape(conv, [batch_size, seq_length, 
-    #                          stroke_length * stroke_embedding_size])
-    # conv shape [batch_size, seq_length, stroke_length * stroke_embedding]
+  #       # conv shape [batch_size, seq_length, 1, embedding]
+  #       conv = tf.squeeze(conv, axis=[2])
+  #       # conv shape [batch_size, seq_length, embedding] 
 
-    # with tf.variable_scope("output"):
-    #   cnn_output = tf.layers.dense(
-    #       inputs=conv,
-    #       units=width,
-    #       activation=tf.nn.relu,
-    #       kernel_initializer=create_initializer(initializer_range))
+  #       outputs.append(conv)
+  #   outputs = tf.concat(outputs, 2)
 
-    # cnn_output = conv
-    # cnn_output shape [batch_size, seq_length, width]
+  #   with tf.variable_scope("output"):
+  #     output = tf.layers.dense(
+  #         inputs=outputs,
+  #         units=width,
+  #         activation=tf.nn.relu,
+  #         kernel_initializer=create_initializer(initializer_range))
 
-  # output += layer_norm_and_dropout(cnn_output, dropout_prob)
-  # output = layer_norm_and_dropout(cnn_output, dropout_prob)
+  # output = layer_norm_and_dropout(output, dropout_prob)
+# ------------------CNN tf.nn-----------------end
+
+# ------------------CNN-----------------
+
+  with tf.variable_scope("embedding_stroke_cnn"):
+    outputs = []
+    for i, (window, filters) in enumerate(stroke_windows_filters):
+      with tf.variable_scope("cnn%s" % i):
+        conv = tf.layers.conv2d(
+            input_strokes,
+            filters=filters,
+            kernel_size=[1, window],
+            strides=(1, 1),
+            padding='valid',
+            data_format='channels_last',
+            dilation_rate=(1, 1),
+            activation=tf.nn.relu,
+            kernel_initializer=create_initializer(initializer_range)) # name ?
+        conv = tf.layers.max_pooling2d(
+            conv,
+            pool_size=[1, stroke_length-window+1],
+            strides=[1, stroke_length-window+1], # ?
+            padding='valid',
+            data_format='channels_last') # name ?
+        # conv shape [batch_size, seq_length, 1, embedding]
+        conv = tf.squeeze(conv, axis=[2])
+        # conv shape [batch_size, seq_length, embedding] 
+        outputs.append(conv)
+    outputs = tf.concat(outputs, 2)
+
+    with tf.variable_scope("output"):
+      output = tf.layers.dense(
+          inputs=outputs,
+          units=width,
+          activation=tf.nn.relu,
+          kernel_initializer=create_initializer(initializer_range))
+
+  output = layer_norm_and_dropout(output, dropout_prob)
 # ------------------CNN-----------------end
   return output
 # end
