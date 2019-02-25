@@ -113,12 +113,16 @@ flags.DEFINE_bool(
 flags.DEFINE_integer(
     "max_stroke_length", 32,
     "[Optional] ")
+
+flags.DEFINE_bool(
+    "do_inner_position", False,
+    "[Optional] ")
 # end
 
 def model_fn_builder(bert_config, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
                      use_one_hot_embeddings, 
-                     do_stroke_cnn=False): # Add by Winfred
+                     do_stroke_cnn=False, do_inner_position=False): # Add by Winfred
   """Returns `model_fn` closure for TPUEstimator."""
 
   def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -143,15 +147,26 @@ def model_fn_builder(bert_config, init_checkpoint, learning_rate,
       input_stroke_ids = None
     # End
 
+    # Add by Winfred
+    if do_inner_position:
+      position_ids = features["position_ids"]
+      inner_position_ids = features["inner_position_ids"]
+    else:
+      position_ids = None
+      inner_position_ids = None
+    # End
+
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
     model = modeling.BertModel(
         config=bert_config,
         is_training=is_training,
         input_ids=input_ids,
-        input_stroke_ids=input_stroke_ids, # Add by Winfred
+        input_stroke_ids=input_stroke_ids,     # Add by Winfred
         input_mask=input_mask,
         token_type_ids=segment_ids,
+        position_ids=position_ids,             # Add by Winfred
+        inner_position_ids=inner_position_ids, # Add by Winfred
         use_one_hot_embeddings=use_one_hot_embeddings)
 
     (masked_lm_loss,
@@ -353,8 +368,9 @@ def input_fn_builder(input_files,
                      max_predictions_per_seq,
                      is_training,
                      num_cpu_threads=4,
-                     do_stroke_cnn=False,     # Add by Winfred
-                     max_stroke_length=None): # Add by Winfred
+                     do_stroke_cnn=False,      # Add by Winfred
+                     max_stroke_length=None,   # Add by Winfred
+                     do_inner_position=False): # Add by Winfred
   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
   def input_fn(params):
@@ -382,6 +398,14 @@ def input_fn_builder(input_files,
     if do_stroke_cnn:
       name_to_features["input_stroke_ids"] = tf.FixedLenFeature(
           [max_seq_length * max_stroke_length], tf.int64)
+    # End
+
+    # Add by Winfred
+    if do_inner_position:
+      name_to_features["position_ids"] = tf.FixedLenFeature(
+          [max_seq_length], tf.int64)
+      name_to_features["inner_position_ids"] = tf.FixedLenFeature(
+          [max_seq_length], tf.int64)
     # End
 
     # For training, we want a lot of parallel reading and shuffling.
@@ -480,7 +504,8 @@ def main(_):
       num_warmup_steps=FLAGS.num_warmup_steps,
       use_tpu=FLAGS.use_tpu,
       use_one_hot_embeddings=FLAGS.use_tpu,
-      do_stroke_cnn=FLAGS.do_stroke_cnn) # Add by Winfred
+      do_stroke_cnn=FLAGS.do_stroke_cnn,         # Add by Winfred
+      do_inner_position=FLAGS.do_inner_position) # Add by Winfred
 
   # If TPU is not available, this will fall back to normal Estimator on CPU
   # or GPU.
@@ -499,8 +524,9 @@ def main(_):
         max_seq_length=FLAGS.max_seq_length,
         max_predictions_per_seq=FLAGS.max_predictions_per_seq,
         is_training=True,
-        do_stroke_cnn=FLAGS.do_stroke_cnn,
-        max_stroke_length=FLAGS.max_stroke_length) # Add by Winfred
+        do_stroke_cnn=FLAGS.do_stroke_cnn,         # Add by Winfred
+        max_stroke_length=FLAGS.max_stroke_length, # Add by Winfred
+        do_inner_position=FLAGS.do_inner_position) # Add by Winfred
     estimator.train(input_fn=train_input_fn, max_steps=FLAGS.num_train_steps)
 
   if FLAGS.do_eval:
@@ -512,8 +538,9 @@ def main(_):
         max_seq_length=FLAGS.max_seq_length,
         max_predictions_per_seq=FLAGS.max_predictions_per_seq,
         is_training=False,
-        do_stroke_cnn=FLAGS.do_stroke_cnn,
-        max_stroke_length=FLAGS.max_stroke_length) # Add by Winfred
+        do_stroke_cnn=FLAGS.do_stroke_cnn,         # Add by Winfred
+        max_stroke_length=FLAGS.max_stroke_length, # Add by Winfred
+        do_inner_position=FLAGS.do_inner_position) # Add by Winfred
 
     result = estimator.evaluate(
         input_fn=eval_input_fn, steps=FLAGS.max_eval_steps)

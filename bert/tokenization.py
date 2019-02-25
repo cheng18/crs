@@ -169,6 +169,15 @@ class FullTokenizer(object):
         max_stroke_length=max_stroke_length)
   # End
 
+  # Add by Winfred
+  def get_substr_ids(self):
+    output = []
+    for token in self.vocab:
+      if token[:2] == "##":
+        output.append(self.vocab[token])
+    return output
+  # End
+
 
 class BasicTokenizer(object):
   """Runs basic tokenization (punctuation splitting, lower casing, etc.)."""

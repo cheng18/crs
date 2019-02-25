@@ -131,9 +131,11 @@ class BertModel(object):
                config,
                is_training,
                input_ids,
-               input_stroke_ids=None, # Add by Winfred
+               input_stroke_ids=None,   # Add by Winfred
                input_mask=None,
                token_type_ids=None,
+               position_ids=None,       # Add by Winfred
+               inner_position_ids=None, # Add by Winfred
                use_one_hot_embeddings=True,
                scope=None):
     """Constructor for BertModel.
@@ -210,6 +212,8 @@ class BertModel(object):
             token_type_ids=token_type_ids,
             token_type_vocab_size=config.type_vocab_size,
             token_type_embedding_name="token_type_embeddings",
+            position_ids=position_ids,             # Add by Winfred
+            inner_position_ids=inner_position_ids, # Add by Winfred
             use_position_embeddings=True,
             position_embedding_name="position_embeddings",
             initializer_range=config.initializer_range,
@@ -600,6 +604,8 @@ def embedding_postprocessor(input_tensor,
                             token_type_ids=None,
                             token_type_vocab_size=16,
                             token_type_embedding_name="token_type_embeddings",
+                            position_ids=None,       # Add by Winfred
+                            inner_position_ids=None, # Add by Winfred
                             use_position_embeddings=True,
                             position_embedding_name="position_embeddings",
                             initializer_range=0.02,
@@ -655,6 +661,34 @@ def embedding_postprocessor(input_tensor,
     token_type_embeddings = tf.reshape(token_type_embeddings,
                                        [batch_size, seq_length, width])
     output += token_type_embeddings
+
+  # Add by Winfred
+  if position_ids is not None:
+    position_table = tf.get_variable(
+        name=position_embedding_name,
+        shape=[max_position_embeddings, width],
+        initializer=create_initializer(initializer_range))
+    flat_position_ids = tf.reshape(position_ids, [-1])
+    position_one_hot_ids = tf.one_hot(flat_position_ids, depth=max_position_embeddings)
+    position_embeddings = tf.matmul(position_one_hot_ids, position_table)
+    position_embeddings = tf.reshape(position_embeddings,
+                                     [batch_size, seq_length, width])
+    output += position_embeddings
+
+    inner_position_table = tf.get_variable(
+        name="inner_position_embedding",
+        shape=[max_position_embeddings, width],
+        initializer=create_initializer(initializer_range))
+    flat_inner_position_ids = tf.reshape(inner_position_ids, [-1])
+    inner_position_one_hot_ids = tf.one_hot(flat_inner_position_ids, 
+        depth=max_position_embeddings)
+    inner_position_embeddings = tf.matmul(inner_position_one_hot_ids, inner_position_table)
+    inner_position_embeddings = tf.reshape(inner_position_embeddings,
+                                     [batch_size, seq_length, width])
+    output += inner_position_embeddings
+
+    use_position_embeddings = False
+  # End
 
   if use_position_embeddings:
     assert_op = tf.assert_less_equal(seq_length, max_position_embeddings)

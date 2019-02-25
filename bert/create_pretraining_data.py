@@ -58,6 +58,10 @@ flags.DEFINE_integer(
 
 flags.DEFINE_string("stroke_vocab_file", None,
                     "[Optional] stroke.csv")
+
+flags.DEFINE_bool(
+    "do_inner_position", False,
+    "")
 # End
 
 flags.DEFINE_integer("max_seq_length", 128, "Maximum sequence length.")
@@ -109,7 +113,8 @@ class TrainingInstance(object):
 
 def write_instance_to_example_files(instances, tokenizer, max_seq_length,
                                     max_predictions_per_seq, output_files,
-                                    do_stroke_cnn=False, max_stroke_length=None): # Add by Winfred
+                                    do_stroke_cnn=False, max_stroke_length=None,  # Add by Winfred
+                                    do_inner_position=False):                     # Add by Winfred
   """Create TF example files from `TrainingInstance`s."""
   writers = []
   for output_file in output_files:
@@ -145,6 +150,35 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
       assert len(input_stroke_ids) == (max_seq_length * max_stroke_length)
     # End
 
+    # Add by Winfred
+    if do_inner_position:
+      position_ids = []
+      inner_position_ids = []
+      substr_ids = tokenizer.get_substr_ids()
+      i = 1
+      inner_i = 1
+      is_start = True
+      for input_id in input_ids:
+        if input_id in substr_ids:
+          if not is_start:
+            i += 1 # test
+            inner_i += 1
+        else:
+          if not is_start:
+            i += 1 
+          inner_i = 1
+        position_ids.append(i)
+        inner_position_ids.append(inner_i)
+        is_start = False
+
+      while len(position_ids) < (max_seq_length):
+        position_ids.append(0)
+        inner_position_ids.append(0)
+
+      assert len(position_ids) == max_seq_length
+      assert len(inner_position_ids) == max_seq_length
+    # End
+
     masked_lm_positions = list(instance.masked_lm_positions)
     masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)
     masked_lm_weights = [1.0] * len(masked_lm_ids)
@@ -167,6 +201,11 @@ def write_instance_to_example_files(instances, tokenizer, max_seq_length,
     # Add by Winfred
     if do_stroke_cnn:
       features["input_stroke_ids"] = create_int_feature(input_stroke_ids)
+    # End
+    # Add by Winfred
+    if do_inner_position:
+      features["position_ids"] = create_int_feature(position_ids)
+      features["inner_position_ids"] = create_int_feature(inner_position_ids)
     # End
 
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
@@ -470,7 +509,8 @@ def main(_):
   write_instance_to_example_files(instances, tokenizer, FLAGS.max_seq_length,
                                   FLAGS.max_predictions_per_seq, output_files,
                                   do_stroke_cnn=FLAGS.do_stroke_cnn,         # Add by Winfred
-                                  max_stroke_length=FLAGS.max_stroke_length) # Add by Winfred
+                                  max_stroke_length=FLAGS.max_stroke_length, # Add by Winfred
+                                  do_inner_position=FLAGS.do_inner_position) # Add by Winfred
 
 
 if __name__ == "__main__":
