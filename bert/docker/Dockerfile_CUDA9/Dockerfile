@@ -69,7 +69,8 @@ RUN ${PIP} install --upgrade \
     setuptools
 
 ARG TF_PACKAGE=tensorflow-gpu
-RUN ${PIP} install ${TF_PACKAGE}
+ARG TF_PACKAGE_VERSION=1.12.0
+RUN ${PIP} install ${TF_PACKAGE}${TF_PACKAGE_VERSION:+==${TF_PACKAGE_VERSION}}
 
 COPY bashrc /etc/bash.bashrc
 RUN chmod a+rwx /etc/bash.bashrc
