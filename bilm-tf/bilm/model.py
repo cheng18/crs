@@ -319,7 +319,7 @@ class BidirectionalLanguageModelGraph(object):
         max_chars = cnn_options['max_characters_per_token']
         char_embed_dim = cnn_options['embedding']['dim']
         n_chars = cnn_options['n_characters']
-        if n_chars != 262:
+        if n_chars != 267: # Winfred
             raise InvalidNumberOfCharacters(
                 "Set n_characters=262 after training see the README.md"
             )

@@ -140,9 +140,9 @@ class LanguageModel(object):
         max_chars = cnn_options['max_characters_per_token']
         char_embed_dim = cnn_options['embedding']['dim']
         n_chars = cnn_options['n_characters']
-        if n_chars != 261:
+        if n_chars != 266: # orignal 261. Modify by Winfred
             raise InvalidNumberOfCharacters(
-                    "Set n_characters=261 for training see the README.md"
+                    "Set n_characters=266 for training see the README.md"
             )
         if cnn_options['activation'] == 'tanh':
             activation = tf.nn.tanh
@@ -1054,9 +1054,9 @@ def load_options_latest_checkpoint(tf_save_dir):
     return options, ckpt_file
 
 
-def load_vocab(vocab_file, max_word_length=None):
+def load_vocab(vocab_file, stroke_vocab_file=None, max_word_length=None): # Winfred 
     if max_word_length:
-        return UnicodeCharsVocabulary(vocab_file, max_word_length,
+        return UnicodeCharsVocabulary(vocab_file, max_word_length, stroke_vocab_file, # Winfred
                                       validate_file=True)
     else:
         return Vocabulary(vocab_file, validate_file=True)

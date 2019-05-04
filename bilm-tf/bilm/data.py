@@ -6,6 +6,7 @@ import numpy as np
 
 from typing import List
 
+import csv
 
 class Vocabulary(object):
     '''
@@ -113,7 +114,7 @@ class UnicodeCharsVocabulary(Vocabulary):
     then be sure to add the +1 appropriately, otherwise embeddings computed
     from the pre-trained model will be useless.
     """
-    def __init__(self, filename, max_word_length, **kwargs):
+    def __init__(self, filename, max_word_length, stroke_vocab_file=None, **kwargs): # Winfred 筆畫字典
         super(UnicodeCharsVocabulary, self).__init__(filename, **kwargs)
         self._max_word_length = max_word_length
 
@@ -127,6 +128,7 @@ class UnicodeCharsVocabulary(Vocabulary):
 
         num_words = len(self._id_to_word)
 
+        # Winfred 若 do_stroke， self._word_char_ids 裏除了 {word: char} 也增加 {中文char: stroke}
         self._word_char_ids = np.zeros([num_words, max_word_length],
             dtype=np.int32)
 
@@ -141,12 +143,30 @@ class UnicodeCharsVocabulary(Vocabulary):
         self.bos_chars = _make_bos_eos(self.bos_char)
         self.eos_chars = _make_bos_eos(self.eos_char)
 
+        # Add by Winfred
+        print('==========================do_?===========================')
+        print('stroke_vocab_file', stroke_vocab_file)
+        if stroke_vocab_file is not None:
+            self.stroke_vocab = load_stroke_vocab(stroke_vocab_file) # Winfred
+            self.do_stroke = True
+            print('==========================do_stroke===========================')
+        else:
+            self.do_stroke = False
+        # End
+
         for i, word in enumerate(self._id_to_word):
-            self._word_char_ids[i] = self._convert_word_to_char_ids(word)
+            # Add by Winfred
+            if self.do_stroke and len(word) == 1 and _is_chinese_char(ord(word)):
+                char = word
+                self._word_char_ids[i] = self._convert_char_to_stroke_ids(char)
+            # End
+            else:
+                self._word_char_ids[i] = self._convert_word_to_char_ids(word)
 
         self._word_char_ids[self.bos] = self.bos_chars
         self._word_char_ids[self.eos] = self.eos_chars
-        # TODO: properly handle <UNK>
+        # TODO: properly handle <UNK> # ??
+
 
     @property
     def word_char_ids(self):
@@ -168,11 +188,31 @@ class UnicodeCharsVocabulary(Vocabulary):
 
         return code
 
+    # Add by Winfred
+    def _convert_char_to_stroke_ids(self, char):
+        stroke_ids = np.zeros([self.max_word_length], dtype=np.int32)
+        stroke_ids[:] = self.pad_char
+        if char in self.stroke_vocab:
+            stroke = self.stroke_vocab[char][:(self.max_word_length-2)] #??
+            stroke_ids[0] = self.bow_char
+            for k, stroke_id in enumerate(stroke, start=1):
+                stroke_ids[k] = stroke_id + 260
+            stroke_ids[len(stroke) + 1] = self.eow_char
+
+        return stroke_ids
+    # End
+
     def word_to_char_ids(self, word):
         if word in self._word_to_id:
             return self._word_char_ids[self._word_to_id[word]]
         else:
-            return self._convert_word_to_char_ids(word)
+            # Add by Winfred
+            if self.do_stroke and len(word) == 1 and _is_chinese_char(ord(word)):
+                char = word
+                return self._convert_char_to_stroke_ids(char)
+            # End
+            else:
+                return self._convert_word_to_char_ids(word)
 
     def encode_chars(self, sentence, reverse=False, split=True):
         '''
@@ -194,7 +234,7 @@ class Batcher(object):
     ''' 
     Batch sentences of tokenized text into character id matrices.
     '''
-    def __init__(self, lm_vocab_file: str, max_token_length: int):
+    def __init__(self, lm_vocab_file: str, max_token_length: int): # Winfred 將加筆畫？
         '''
         lm_vocab_file = the language model vocabulary file (one line per
             token)
@@ -222,7 +262,7 @@ class Batcher(object):
         for k, sent in enumerate(sentences):
             length = len(sent) + 2
             char_ids_without_mask = self._lm_vocab.encode_chars(
-                sent, split=False)
+                sent, split=False) # Winfred 將加筆畫？
             # add one so that 0 is the mask value
             X_char_ids[k, :length, :] = char_ids_without_mask + 1
 
@@ -380,6 +420,8 @@ class LMDataset(object):
         with open(shard_name) as f:
             sentences_raw = f.readlines()
 
+        sentences_raw = [_tokenize_chinese_chars(sentence) for sentence in sentences_raw] # Winfred 中文加空格
+        
         if self._reverse:
             sentences = []
             for sentence in sentences_raw:
@@ -463,3 +505,55 @@ class BidirectionalLMDataset(object):
 class InvalidNumberOfCharacters(Exception):
     pass
 
+
+# add by winfred
+def load_stroke_vocab(stroke_vocab_file):
+  """Loads a stroke vocabulary file into a dictionary."""
+  with open(stroke_vocab_file, newline="", encoding="utf8") as csvfile:
+    reader = csv.reader(csvfile, delimiter=",", quotechar='"')
+    header = next(reader)
+    char_index = header.index("汉字")
+    stroke_index = header.index("笔顺")
+
+    stroke_vocab = {}
+    for row in reader:
+      stroke_vocab[row[char_index]] = list(map(int, row[stroke_index]))
+
+  return stroke_vocab
+# end
+
+# Winfred 判斷是不是中文
+def _is_chinese_char(cp):
+    """Checks whether CP is the codepoint of a CJK character."""
+    # This defines a "chinese character" as anything in the CJK Unicode block:
+    #   https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
+    #
+    # Note that the CJK Unicode block is NOT all Japanese and Korean characters,
+    # despite its name. The modern Korean Hangul alphabet is a different block,
+    # as is Japanese Hiragana and Katakana. Those alphabets are used to write
+    # space-separated words, so they are not treated specially and handled
+    # like the all of the other languages.
+    if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
+        (cp >= 0x3400 and cp <= 0x4DBF) or  #
+        (cp >= 0x20000 and cp <= 0x2A6DF) or  #
+        (cp >= 0x2A700 and cp <= 0x2B73F) or  #
+        (cp >= 0x2B740 and cp <= 0x2B81F) or  #
+        (cp >= 0x2B820 and cp <= 0x2CEAF) or
+        (cp >= 0xF900 and cp <= 0xFAFF) or  #
+        (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+        return True
+
+    return False
+
+def _tokenize_chinese_chars(text):
+    """Adds whitespace around any CJK character."""
+    output = []
+    for char in text:
+        cp = ord(char)
+        if _is_chinese_char(cp):
+            output.append(" ")
+            output.append(char)
+            output.append(" ")
+        else:
+            output.append(char) 
+    return "".join(output)

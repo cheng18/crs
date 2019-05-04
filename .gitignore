@@ -4,6 +4,7 @@ downstream_data/
 
 # model
 bert/model/
+bilm-tf/model/
 
 # vocab
 vocab/
