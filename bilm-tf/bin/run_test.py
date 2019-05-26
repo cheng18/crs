@@ -12,7 +12,8 @@ def main(args):
         max_word_length = options['char_cnn']['max_characters_per_token']
     else:
         max_word_length = None
-    vocab = load_vocab(args.vocab_file, max_word_length)
+    # vocab = load_vocab(args.vocab_file, max_word_length)
+    vocab = load_vocab(args.vocab_file, args.stroke_vocab_file, 50) # Winfred stroke_vocab
 
     test_prefix = args.test_prefix
 
@@ -37,6 +38,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size',
         type=int, default=256,
         help='Batch size')
+    parser.add_argument('--stroke_vocab_file', help='') # Add by Winfred
 
     args = parser.parse_args()
     main(args)

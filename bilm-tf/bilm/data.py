@@ -156,7 +156,7 @@ class UnicodeCharsVocabulary(Vocabulary):
 
         for i, word in enumerate(self._id_to_word):
             # Add by Winfred
-            if self.do_stroke and len(word) == 1 and _is_chinese_char(ord(word)):
+            if self.do_stroke and len(word) == 1 and is_chinese_char(ord(word)):
                 char = word
                 self._word_char_ids[i] = self._convert_char_to_stroke_ids(char)
             # End
@@ -207,7 +207,7 @@ class UnicodeCharsVocabulary(Vocabulary):
             return self._word_char_ids[self._word_to_id[word]]
         else:
             # Add by Winfred
-            if self.do_stroke and len(word) == 1 and _is_chinese_char(ord(word)):
+            if self.do_stroke and len(word) == 1 and is_chinese_char(ord(word)):
                 char = word
                 return self._convert_char_to_stroke_ids(char)
             # End
@@ -234,16 +234,19 @@ class Batcher(object):
     ''' 
     Batch sentences of tokenized text into character id matrices.
     '''
-    def __init__(self, lm_vocab_file: str, max_token_length: int): # Winfred 將加筆畫？
+    def __init__(self, lm_vocab_file: str, max_token_length: int,
+                 max_seq_length=None): # Add by Winfred
         '''
         lm_vocab_file = the language model vocabulary file (one line per
             token)
         max_token_length = the maximum number of characters in each token
+        max_length = 句子最大長度
         '''
         self._lm_vocab = UnicodeCharsVocabulary(
             lm_vocab_file, max_token_length
         )
         self._max_token_length = max_token_length
+        self._max_seq_length = max_seq_length # Add by Winred
 
     def batch_sentences(self, sentences: List[List[str]]):
         '''
@@ -252,7 +255,10 @@ class Batcher(object):
         [['The', 'first', 'sentence', '.'], ['Second', '.']]
         '''
         n_sentences = len(sentences)
-        max_length = max(len(sentence) for sentence in sentences) + 2
+        if self._max_seq_length is None: # Add by Winfred
+            max_length = max(len(sentence) for sentence in sentences) + 2 # ？ Why + 2
+        else:
+            max_length = self._max_seq_length + 2 # Add by Winfred
 
         X_char_ids = np.zeros(
             (n_sentences, max_length, self._max_token_length),
@@ -260,6 +266,8 @@ class Batcher(object):
         )
 
         for k, sent in enumerate(sentences):
+            if self._max_seq_length and len(sent) > self._max_seq_length:   # Add by Winfred
+                sent = sent[:self._max_seq_length] # Add by Winfred
             length = len(sent) + 2
             char_ids_without_mask = self._lm_vocab.encode_chars(
                 sent, split=False) # Winfred 將加筆畫？
@@ -273,12 +281,14 @@ class TokenBatcher(object):
     ''' 
     Batch sentences of tokenized text into token id matrices.
     '''
-    def __init__(self, lm_vocab_file: str):
+    def __init__(self, lm_vocab_file: str,
+                 max_seq_length=None): # Add by Winfred
         '''
         lm_vocab_file = the language model vocabulary file (one line per
             token)
         '''
         self._lm_vocab = Vocabulary(lm_vocab_file)
+        self._max_seq_length = max_seq_length # Add by Winred
 
     def batch_sentences(self, sentences: List[List[str]]):
         '''
@@ -287,11 +297,16 @@ class TokenBatcher(object):
         [['The', 'first', 'sentence', '.'], ['Second', '.']]
         '''
         n_sentences = len(sentences)
-        max_length = max(len(sentence) for sentence in sentences) + 2
+        if self._max_seq_length is None: # Add by Winfred
+            max_length = max(len(sentence) for sentence in sentences) + 2
+        else:
+            max_length = self._max_seq_length + 2 # Add by Winfred
 
         X_ids = np.zeros((n_sentences, max_length), dtype=np.int64)
 
         for k, sent in enumerate(sentences):
+            if self._max_seq_length and len(sent) > self._max_seq_length:   # Add by Winfred
+                sent = sent[:self._max_seq_length] # Add by Winfred
             length = len(sent) + 2
             ids_without_mask = self._lm_vocab.encode(sent, split=False)
             # add one so that 0 is the mask value
@@ -420,7 +435,7 @@ class LMDataset(object):
         with open(shard_name) as f:
             sentences_raw = f.readlines()
 
-        sentences_raw = [_tokenize_chinese_chars(sentence) for sentence in sentences_raw] # Winfred 中文加空格
+        sentences_raw = [tokenize_chinese_chars(sentence) for sentence in sentences_raw] # Winfred 中文加空格
         
         if self._reverse:
             sentences = []
@@ -523,7 +538,7 @@ def load_stroke_vocab(stroke_vocab_file):
 # end
 
 # Winfred 判斷是不是中文
-def _is_chinese_char(cp):
+def is_chinese_char(cp):
     """Checks whether CP is the codepoint of a CJK character."""
     # This defines a "chinese character" as anything in the CJK Unicode block:
     #   https://en.wikipedia.org/wiki/CJK_Unified_Ideographs_(Unicode_block)
@@ -545,12 +560,12 @@ def _is_chinese_char(cp):
 
     return False
 
-def _tokenize_chinese_chars(text):
+def tokenize_chinese_chars(text):
     """Adds whitespace around any CJK character."""
     output = []
     for char in text:
         cp = ord(char)
-        if _is_chinese_char(cp):
+        if is_chinese_char(cp):
             output.append(" ")
             output.append(char)
             output.append(" ")
