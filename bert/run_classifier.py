@@ -20,6 +20,7 @@ from __future__ import print_function
 
 import collections
 import csv
+import json # Add by Winfred
 import os
 import modeling
 import optimization
@@ -378,6 +379,46 @@ class ColaProcessor(DataProcessor):
       examples.append(
           InputExample(guid=guid, text_a=text_a, text_b=None, label=label))
     return examples
+
+
+# Add by Winfred
+class LcqmcProcessor(DataProcessor):
+  """Processor for the LCQMC data set."""
+
+  def get_train_examples(self, data_dir):
+    """See base class."""
+    data_dir = os.path.join(data_dir, "LCQMC_train.json")
+    return self._create_examples(data_dir, "train")
+
+  def get_dev_examples(self, data_dir):
+    """See base class."""
+    data_dir = os.path.join(data_dir, "LCQMC_dev.json")
+    return self._create_examples(data_dir, "dev")
+
+  def get_test_examples(self, data_dir):
+    """See base class."""
+    data_dir = os.path.join(data_dir, "LCQMC_test.json")
+    return self._create_examples(data_dir, "test")
+
+  def get_labels(self):
+    """See base class."""
+    return ["0", "1"]
+
+  def _create_examples(self, data_dir, set_type):
+    """Creates examples for the training and dev sets."""
+    examples = []
+    with tf.gfile.Open(data_dir, 'r') as f:
+      lines = f.readlines()
+      for line in lines:
+        example = json.loads(line)
+        guid = "%s-%s" % (set_type, tokenization.convert_to_unicode(example["ID"]))
+        text_a = tokenization.convert_to_unicode(example["sentence1"])
+        text_b = tokenization.convert_to_unicode(example["sentence2"])
+        label = tokenization.convert_to_unicode(example["gold_label"])
+        examples.append(
+            InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+    return examples
+# End
 
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
@@ -879,6 +920,7 @@ def main(_):
       "mnli": MnliProcessor,
       "mrpc": MrpcProcessor,
       "xnli": XnliProcessor,
+      "lcqmc": LcqmcProcessor # Add by Winfred
   }
 
   if not FLAGS.do_train and not FLAGS.do_eval and not FLAGS.do_predict:
