@@ -4,4 +4,6 @@ WORKDIR /crs_elmo
 
 RUN apt-get update && apt-get install vim -y
 RUN apt-get update && apt-get install git -y
+RUN pip install --upgrade pip
+RUN pip install tensorflow-hub
 
