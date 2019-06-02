@@ -235,7 +235,7 @@ class Batcher(object):
     Batch sentences of tokenized text into character id matrices.
     '''
     def __init__(self, lm_vocab_file: str, max_token_length: int,
-                 max_seq_length=None): # Add by Winfred
+                 max_seq_length=None, stroke_vocab_file=None): # Add by Winfred
         '''
         lm_vocab_file = the language model vocabulary file (one line per
             token)
@@ -243,7 +243,8 @@ class Batcher(object):
         max_length = 句子最大長度
         '''
         self._lm_vocab = UnicodeCharsVocabulary(
-            lm_vocab_file, max_token_length
+            lm_vocab_file, max_token_length,
+            stroke_vocab_file=stroke_vocab_file # Add by Winfred
         )
         self._max_token_length = max_token_length
         self._max_seq_length = max_seq_length # Add by Winred

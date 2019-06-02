@@ -641,13 +641,14 @@ def dump_token_embeddings(vocab_file, options_file, weight_file, outfile):
         )
 
 def dump_bilm_embeddings(vocab_file, dataset_file, options_file,
-                         weight_file, outfile):
+                         weight_file, outfile,
+                         max_seq_len): # Add by Winfred
     with open(options_file, 'r') as fin:
         options = json.load(fin)
     max_word_length = options['char_cnn']['max_characters_per_token']
 
     vocab = UnicodeCharsVocabulary(vocab_file, max_word_length)
-    batcher = Batcher(vocab_file, max_word_length)
+    batcher = Batcher(vocab_file, max_word_length, max_seq_len) # Modify by Winfred
 
     ids_placeholder = tf.placeholder('int32',
                                      shape=(None, None, max_word_length)
