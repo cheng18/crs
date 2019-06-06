@@ -145,55 +145,64 @@ def printable_text(text):
   else:
     raise ValueError("Not running on Python2 or Python 3?")
 
-def tokenize(text):
+
+class Tokenizer(object):
+
+  def __init__(self, vocab_file, max_seq_length, max_token_length=None, do_token=False):
+    if do_token:
+      self.batcher = TokenBatcher(vocab_file, max_seq_length=max_seq_length-2)
+    else:
+      self.batcher = Batcher(vocab_file, max_token_length, max_seq_length=max_seq_length-2)
+
+  def tokenize(self, text):
     """
     text to token, for example:
     text=‘Pretrained biLMs compute representations useful for NLP tasks.’
     token=['Pretrained', 'biLMs', 'compute', 'representations', 'useful', 'for', 'NLP', 'tasks', '.']
     """
-
-    def _is_punctuation(char):
-        """Checks whether `chars` is a punctuation character."""
-        cp = ord(char)
-        # We treat all non-letter/number ASCII as punctuation.
-        # Characters such as "^", "$", and "`" are not in the Unicode
-        # Punctuation class but we treat them as punctuation anyways, for
-        # consistency.
-        if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
-            (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
-            return True
-        cat = unicodedata.category(char)
-        if cat.startswith("P"):
-            return True
-        return False
-
-    def _run_split_on_punc(text):
-        """Splits punctuation on a piece of text."""
-        chars = list(text)
-        i = 0
-        start_new_word = True
-        output = []
-        while i < len(chars):
-            char = chars[i]
-            if _is_punctuation(char):
-                output.append([char])
-                start_new_word = True
-            else:
-                if start_new_word:
-                    output.append([])
-                start_new_word = False
-                output[-1].append(char)
-            i += 1
-        return ["".join(x) for x in output]
-
     text = tokenize_chinese_chars(text)
-
     text = text.strip()
     tokens = []
     for word in text.split():
-        tokens.extend(_run_split_on_punc(word))
-
+        tokens.extend(self._run_split_on_punc(word))
     return tokens
+
+  def convert_tokens_to_ids(self, tokens):
+    return self.batcher.batch_sentences([tokens])[0]
+  
+  def _is_punctuation(self, char):
+    """Checks whether `chars` is a punctuation character."""
+    cp = ord(char)
+    # We treat all non-letter/number ASCII as punctuation.
+    # Characters such as "^", "$", and "`" are not in the Unicode
+    # Punctuation class but we treat them as punctuation anyways, for
+    # consistency.
+    if ((cp >= 33 and cp <= 47) or (cp >= 58 and cp <= 64) or
+        (cp >= 91 and cp <= 96) or (cp >= 123 and cp <= 126)):
+        return True
+    cat = unicodedata.category(char)
+    if cat.startswith("P"):
+        return True
+    return False
+
+  def _run_split_on_punc(self, text):
+    """Splits punctuation on a piece of text."""
+    chars = list(text)
+    i = 0
+    start_new_word = True
+    output = []
+    while i < len(chars):
+        char = chars[i]
+        if self._is_punctuation(char):
+            output.append([char])
+            start_new_word = True
+        else:
+            if start_new_word:
+                output.append([])
+            start_new_word = False
+            output[-1].append(char)
+        i += 1
+    return ["".join(x) for x in output]
 
 class InputExample(object):
   """A single training/test example for simple sequence classification."""
@@ -301,17 +310,17 @@ class XnliProcessor(DataProcessor):
     return ["contradiction", "entailment", "neutral"]
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
-                           batcher):
+                           tokenizer):
   """Converts a single `InputExample` into a single `InputFeatures`."""
   label_map = {}
   for (i, label) in enumerate(label_list):
     label_map[label] = i
 
-  tokens_a = tokenize(example.text_a)
-  tokens_b = tokenize(example.text_b)
+  tokens_a = tokenizer.tokenize(example.text_a)
+  tokens_b = tokenizer.tokenize(example.text_b)
 
-  input_a_ids = batcher.batch_sentences([tokens_a])[0]
-  input_b_ids = batcher.batch_sentences([tokens_b])[0]
+  input_a_ids = tokenizer.convert_tokens_to_ids(tokens_a)
+  input_b_ids = tokenizer.convert_tokens_to_ids(tokens_b)
 
   assert len(input_a_ids) == max_seq_length
   assert len(input_b_ids) == max_seq_length
@@ -335,7 +344,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
 
 
 def file_based_convert_examples_to_features(
-    examples, label_list, max_seq_length, batcher, output_file):
+    examples, label_list, max_seq_length, tokenizer, output_file):
   """Convert a set of `InputExample`s to a TFRecord file."""
 
   writer = tf.python_io.TFRecordWriter(output_file)
@@ -345,7 +354,7 @@ def file_based_convert_examples_to_features(
       tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
 
     feature = convert_single_example(ex_index, example, label_list,
-                                     max_seq_length, batcher)
+                                     max_seq_length, tokenizer)
 
     def create_int_feature(values):
       f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -559,7 +568,7 @@ def main(_):
 
   label_list = processor.get_labels()
 
-  batcher = TokenBatcher(FLAGS.vocab_file, max_seq_length=FLAGS.max_seq_length-2)
+  tokenizer = Tokenizer(FLAGS.vocab_file, FLAGS.max_seq_length, do_token=True)
   vocab_size = 10000 #793471
 
   tpu_cluster_resolver = None
@@ -611,7 +620,7 @@ def main(_):
     train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
     if FLAGS.dont_train_tfrecord is not True:
       file_based_convert_examples_to_features(
-          train_examples, label_list, FLAGS.max_seq_length, batcher, train_file)
+          train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", len(train_examples))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
@@ -627,7 +636,7 @@ def main(_):
     eval_examples = processor.get_dev_examples(FLAGS.data_dir)
     eval_file = os.path.join(FLAGS.output_dir, "eval.tf_record")
     file_based_convert_examples_to_features(
-        eval_examples, label_list, FLAGS.max_seq_length, batcher, eval_file) 
+        eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file) 
 
     tf.logging.info("***** Running evaluation *****")
     tf.logging.info("  Num examples = %d", len(eval_examples))
@@ -662,7 +671,7 @@ def main(_):
     predict_examples = processor.get_test_examples(FLAGS.data_dir)
     predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
     file_based_convert_examples_to_features(predict_examples, label_list,
-                                            FLAGS.max_seq_length, batcher,
+                                            FLAGS.max_seq_length, tokenizer,
                                             predict_file)
 
     tf.logging.info("***** Running prediction*****")
