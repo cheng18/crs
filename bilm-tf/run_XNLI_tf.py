@@ -35,6 +35,22 @@ flags.DEFINE_string(
 ## Other parameters
 
 flags.DEFINE_bool(
+    "do_elmo", False,
+    "")
+
+flags.DEFINE_string(
+    "elmo_options_file", None,
+    "")
+    
+flags.DEFINE_string(
+    "elmo_weight_file", None,
+    "")
+
+flags.DEFINE_integer(
+    "max_token_length", None,
+    "")
+
+flags.DEFINE_bool(
     "dont_train_tfrecord", False,
     "")
 
@@ -104,6 +120,7 @@ flags.DEFINE_integer(
     "num_tpu_cores", 8,
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
+
 def convert_to_unicode(text):
   """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
   if six.PY3:
@@ -148,11 +165,15 @@ def printable_text(text):
 
 class Tokenizer(object):
 
-  def __init__(self, vocab_file, max_seq_length, max_token_length=None, do_token=False):
-    if do_token:
-      self.batcher = TokenBatcher(vocab_file, max_seq_length=max_seq_length-2)
-    else:
-      self.batcher = Batcher(vocab_file, max_token_length, max_seq_length=max_seq_length-2)
+  def __init__(self, vocab_file, max_seq_length, max_token_length=None):
+    self.vocab_file = vocab_file
+    self.max_seq_length = max_seq_length
+    self.max_token_length = max_token_length
+    
+    max_seq_length = self.max_seq_length - 2 # 因會加 <bos> and <eos>，所以 -2
+    self.token_batcher = TokenBatcher(self.vocab_file, max_seq_length)
+    if max_token_length:
+      self.batcher = Batcher(self.vocab_file, self.max_token_length, max_seq_length)
 
   def tokenize(self, text):
     """
@@ -168,8 +189,14 @@ class Tokenizer(object):
     return tokens
 
   def convert_tokens_to_ids(self, tokens):
-    return self.batcher.batch_sentences([tokens])[0]
-  
+    return self.token_batcher.batch_sentences([tokens])[0]
+
+  def convert_tokens_to_char_ids(self, tokens):
+    char_ids = self.batcher.batch_sentences([tokens])[0]
+    flat_char_ids = [char_id for sublist in char_ids for char_id in sublist]
+    # flat_char_ids = tf.reshape(char_ids, [-1])
+    return flat_char_ids
+
   def _is_punctuation(self, char):
     """Checks whether `chars` is a punctuation character."""
     cp = ord(char)
@@ -227,10 +254,13 @@ class InputExample(object):
 class InputFeatures(object):
   """A single set of features of data."""
 
-  def __init__(self, input_a_ids, input_b_ids, label_id):
+  def __init__(self, input_a_ids, input_b_ids, label_id,
+               input_a_char_ids=None, input_b_char_ids=None):
     self.input_a_ids = input_a_ids
     self.input_b_ids = input_b_ids
     self.label_id = label_id
+    self.input_a_char_ids = input_a_char_ids
+    self.input_b_char_ids = input_b_char_ids
 
 class DataProcessor(object):
   """Base class for data converters for sequence classification data sets."""
@@ -310,7 +340,7 @@ class XnliProcessor(DataProcessor):
     return ["contradiction", "entailment", "neutral"]
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
-                           tokenizer):
+                           tokenizer, max_token_length=None):
   """Converts a single `InputExample` into a single `InputFeatures`."""
   label_map = {}
   for (i, label) in enumerate(label_list):
@@ -321,6 +351,12 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
 
   input_a_ids = tokenizer.convert_tokens_to_ids(tokens_a)
   input_b_ids = tokenizer.convert_tokens_to_ids(tokens_b)
+
+  input_a_char_ids = None
+  input_b_char_ids = None
+  if max_token_length:
+    input_a_char_ids = tokenizer.convert_tokens_to_char_ids(tokens_a)
+    input_b_char_ids = tokenizer.convert_tokens_to_char_ids(tokens_b)
 
   assert len(input_a_ids) == max_seq_length
   assert len(input_b_ids) == max_seq_length
@@ -333,18 +369,24 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
     tf.logging.info("tokens_b: %s" % " ".join([printable_text(x) for x in tokens_b]))
     tf.logging.info("input_a_ids: %s" % " ".join([str(x) for x in input_a_ids]))
     tf.logging.info("input_b_ids: %s" % " ".join([str(x) for x in input_b_ids]))
+    if max_token_length:
+      tf.logging.info("input_a_char_ids: %s" % " ".join([str(x) for x in input_a_char_ids]))
+      tf.logging.info("input_b_char_ids: %s" % " ".join([str(x) for x in input_b_char_ids]))
     tf.logging.info("label: %s (id = %d)" % (example.label, label_id))
 
   feature = InputFeatures(
       input_a_ids=input_a_ids,
       input_b_ids=input_b_ids,
-      label_id=label_id)
+      label_id=label_id,
+      input_a_char_ids=input_a_char_ids,
+      input_b_char_ids=input_b_char_ids)
 
   return feature
 
 
 def file_based_convert_examples_to_features(
-    examples, label_list, max_seq_length, tokenizer, output_file):
+    examples, label_list, max_seq_length, tokenizer, output_file, 
+    max_token_length=None):
   """Convert a set of `InputExample`s to a TFRecord file."""
 
   writer = tf.python_io.TFRecordWriter(output_file)
@@ -354,7 +396,7 @@ def file_based_convert_examples_to_features(
       tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
 
     feature = convert_single_example(ex_index, example, label_list,
-                                     max_seq_length, tokenizer)
+                                     max_seq_length, tokenizer, max_token_length)
 
     def create_int_feature(values):
       f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
@@ -364,13 +406,16 @@ def file_based_convert_examples_to_features(
     features["input_a_ids"] = create_int_feature(feature.input_a_ids)
     features["input_b_ids"] = create_int_feature(feature.input_b_ids)
     features["label_ids"] = create_int_feature([feature.label_id])
+    if max_token_length:
+      features["input_a_char_ids"] = create_int_feature(feature.input_a_char_ids)
+      features["input_b_char_ids"] = create_int_feature(feature.input_b_char_ids)
     
     tf_example = tf.train.Example(features=tf.train.Features(feature=features))
     writer.write(tf_example.SerializeToString())
 
 
 def file_based_input_fn_builder(input_file, seq_length, is_training,
-                                drop_remainder):
+                                drop_remainder, max_token_length=None):
   """Creates an `input_fn` closure to be passed to TPUEstimator."""
 
   name_to_features = {
@@ -378,6 +423,11 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
       "input_b_ids": tf.FixedLenFeature([seq_length], tf.int64),
       "label_ids": tf.FixedLenFeature([], tf.int64),
   }
+
+  if max_token_length:
+    length = seq_length * max_token_length
+    name_to_features["input_a_char_ids"] = tf.FixedLenFeature([length], tf.int64)
+    name_to_features["input_b_char_ids"] = tf.FixedLenFeature([length], tf.int64)
 
   def _decode_record(record, name_to_features):
     """Decodes a record to a TensorFlow example."""
@@ -414,22 +464,80 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
   return input_fn
 
+def get_shape_list(tensor, expected_rank=None, name=None):
+  """Returns a list of the shape of tensor, preferring static dimensions.
 
-def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels, vocab_size):
+  Args:
+    tensor: A tf.Tensor object to find the shape of.
+    expected_rank: (optional) int. The expected rank of `tensor`. If this is
+      specified and the `tensor` has a different rank, and exception will be
+      thrown.
+    name: Optional name of the tensor for the error message.
 
-  embed = tf.keras.layers.Embedding(vocab_size, 300, input_length=50)
-  a_embedding = embed(input_a_ids)
-  b_embedding = embed(input_b_ids)
+  Returns:
+    A list of dimensions of the shape of tensor. All static dimensions will
+    be returned as python integers, and dynamic dimensions will be returned
+    as tf.Tensor scalars.
+  """
+  if name is None:
+    name = tensor.name
+
+  if expected_rank is not None:
+    assert_rank(tensor, expected_rank, name)
+
+  shape = tensor.shape.as_list()
+
+  non_static_indexes = []
+  for (index, dim) in enumerate(shape):
+    if dim is None:
+      non_static_indexes.append(index)
+
+  if not non_static_indexes:
+    return shape
+
+  dyn_shape = tf.shape(tensor)
+  for index in non_static_indexes:
+    shape[index] = dyn_shape[index]
+  return shape
+
+def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels, 
+                 max_seq_length, vocab_size=None, do_elmo=False, 
+                 input_a_char_ids=None, input_b_char_ids=None, 
+                 elmo_options_file=None, elmo_weight_file=None,
+                 max_token_length=None):
+
+  input_shape = get_shape_list(input_a_ids)
+  batch_size = input_shape[0]
+
+  if do_elmo:
+    # Build the biLM graph.
+    bilm = BidirectionalLanguageModel(elmo_options_file, elmo_weight_file)
+    # reshape
+    input_a_char_ids = tf.reshape(input_a_char_ids, 
+        [batch_size, max_seq_length, max_token_length])
+    input_b_char_ids = tf.reshape(input_b_char_ids, 
+        [batch_size, max_seq_length, max_token_length])
+    # Get ops to compute the LM embeddings.
+    a_embeddings_op = bilm(input_a_char_ids) # char_ids
+    b_embeddings_op = bilm(input_b_char_ids) # char_ids
+    a_embedding = weight_layers("input", a_embeddings_op, l2_coef=0.0)["weighted_op"]
+    with tf.variable_scope("", reuse=True):
+        # the reuse=True scope reuses weights from the context for the question
+        b_embedding = weight_layers("input", b_embeddings_op, l2_coef=0.0)["weighted_op"]
+  else:
+    embed = tf.keras.layers.Embedding(vocab_size, 300, input_length=max_seq_length)
+    a_embedding = embed(input_a_ids)
+    b_embedding = embed(input_b_ids)
 
   # translate = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(300, activation='relu'))
   # a_embedding = translate(a_embedding)
   # b_embedding = translate(b_embedding)
 
-  layer_LSTM = tf.keras.layers.LSTM(300)
+  layer_LSTM = tf.keras.layers.CuDNNLSTM(300)
   output_a = layer_LSTM(a_embedding)
   output_b = layer_LSTM(b_embedding)
-  # output_a = tf.keras.layers.BatchNormalization()(output_a)
-  # output_b = tf.keras.layers.BatchNormalization()(output_b)
+  output_a = tf.keras.layers.BatchNormalization()(output_a)
+  output_b = tf.keras.layers.BatchNormalization()(output_b)
 
   output = tf.keras.layers.concatenate([output_a, output_b], axis=-1) # ?
   output = tf.keras.layers.Dropout(0.2)(output)
@@ -438,17 +546,17 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels, v
                                   activation='relu', 
                                   kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
   output = tf.keras.layers.Dropout(0.2)(output)
-  # output = tf.keras.layers.BatchNormalization()(output)
+  output = tf.keras.layers.BatchNormalization()(output)
   output = tf.keras.layers.Dense(600, 
                                   activation='relu', 
                                   kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
   output = tf.keras.layers.Dropout(0.2)(output)
-  # output = tf.keras.layers.BatchNormalization()(output)
+  output = tf.keras.layers.BatchNormalization()(output)
   output = tf.keras.layers.Dense(600, 
                                   activation='relu', 
                                   kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
   output = tf.keras.layers.Dropout(0.2)(output)
-  # output = tf.keras.layers.BatchNormalization()(output)
+  output = tf.keras.layers.BatchNormalization()(output)
 
   hidden_size = output.shape[-1].value
 
@@ -479,7 +587,10 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels, v
 
 def model_fn_builder(num_labels, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
-                     use_one_hot_embeddings, vocab_size):
+                     use_one_hot_embeddings, vocab_size,
+                     do_elmo, 
+                     elmo_options_file=None, elmo_weight_file=None,
+                     max_seq_length=None, max_token_length=None):
   """Returns `model_fn` closure for TPUEstimator."""
 
   def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -492,11 +603,19 @@ def model_fn_builder(num_labels, init_checkpoint, learning_rate,
     input_a_ids = features["input_a_ids"]
     input_b_ids = features["input_b_ids"]
     label_ids = features["label_ids"]
+    input_a_char_ids = None
+    input_b_char_ids = None
+    if max_token_length and "input_a_char_ids" in features:
+      input_a_char_ids = features["input_a_char_ids"]
+      input_b_char_ids = features["input_b_char_ids"]
 
     is_training = (mode == tf.estimator.ModeKeys.TRAIN)
 
     (total_loss, per_example_loss, logits, probabilities) = create_model(
-        is_training, input_a_ids, input_b_ids, label_ids, num_labels, vocab_size)
+        is_training, input_a_ids, input_b_ids, label_ids, num_labels, 
+        max_seq_length, vocab_size, 
+        do_elmo, input_a_char_ids, input_b_char_ids,
+        elmo_options_file, elmo_weight_file, max_token_length)
 
     tvars = tf.trainable_variables()
     initialized_variable_names = {}
@@ -516,11 +635,18 @@ def model_fn_builder(num_labels, init_checkpoint, learning_rate,
       train_op = optimization.create_optimizer(
           total_loss, learning_rate, num_train_steps, num_warmup_steps, use_tpu)
 
+      # Add by Winfred
+      logging_hook = tf.train.LoggingTensorHook(
+          {"loss": total_loss},
+          every_n_iter=100)
+      # End
+
       output_spec = tf.contrib.tpu.TPUEstimatorSpec(
           mode=mode,
           loss=total_loss,
           train_op=train_op,
-          scaffold_fn=scaffold_fn)
+          scaffold_fn=scaffold_fn,
+          training_hooks=[logging_hook]) # Add by Winfred
     elif mode == tf.estimator.ModeKeys.EVAL:
 
       def metric_fn(per_example_loss, label_ids, logits):
@@ -568,8 +694,10 @@ def main(_):
 
   label_list = processor.get_labels()
 
-  tokenizer = Tokenizer(FLAGS.vocab_file, FLAGS.max_seq_length, do_token=True)
-  vocab_size = 10000 #793471
+  tokenizer = Tokenizer(vocab_file=FLAGS.vocab_file, 
+                        max_seq_length=FLAGS.max_seq_length, 
+                        max_token_length=FLAGS.max_token_length) 
+  vocab_size = 86910 #793471
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
@@ -604,7 +732,12 @@ def main(_):
       num_warmup_steps=num_warmup_steps,
       use_tpu=FLAGS.use_tpu,
       use_one_hot_embeddings=FLAGS.use_tpu,
-      vocab_size=vocab_size)
+      vocab_size=vocab_size,
+      do_elmo=FLAGS.do_elmo,
+      elmo_options_file=FLAGS.elmo_options_file, 
+      elmo_weight_file=FLAGS.elmo_weight_file,
+      max_seq_length=FLAGS.max_seq_length,
+      max_token_length=FLAGS.max_token_length)
 
   # If TPU is not available, this will fall back to normal Estimator on CPU
   # or GPU.
@@ -620,7 +753,8 @@ def main(_):
     train_file = os.path.join(FLAGS.output_dir, "train.tf_record")
     if FLAGS.dont_train_tfrecord is not True:
       file_based_convert_examples_to_features(
-          train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
+          train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file, 
+          max_token_length=FLAGS.max_token_length)
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", len(train_examples))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
@@ -629,14 +763,16 @@ def main(_):
         input_file=train_file,
         seq_length=FLAGS.max_seq_length,
         is_training=True,
-        drop_remainder=True)
+        drop_remainder=True,
+        max_token_length=FLAGS.max_token_length)
     estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
   if FLAGS.do_eval:
     eval_examples = processor.get_dev_examples(FLAGS.data_dir)
     eval_file = os.path.join(FLAGS.output_dir, "eval.tf_record")
     file_based_convert_examples_to_features(
-        eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file) 
+        eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file,
+        max_token_length=FLAGS.max_token_length) 
 
     tf.logging.info("***** Running evaluation *****")
     tf.logging.info("  Num examples = %d", len(eval_examples))
@@ -656,7 +792,8 @@ def main(_):
         input_file=eval_file,
         seq_length=FLAGS.max_seq_length,
         is_training=False,
-        drop_remainder=eval_drop_remainder)
+        drop_remainder=eval_drop_remainder,
+        max_token_length=FLAGS.max_token_length)
 
     result = estimator.evaluate(input_fn=eval_input_fn, steps=eval_steps)
 
@@ -672,7 +809,8 @@ def main(_):
     predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
     file_based_convert_examples_to_features(predict_examples, label_list,
                                             FLAGS.max_seq_length, tokenizer,
-                                            predict_file)
+                                            predict_file,
+                                            max_token_length=FLAGS.max_token_length)
 
     tf.logging.info("***** Running prediction*****")
     tf.logging.info("  Num examples = %d", len(predict_examples))
@@ -688,7 +826,8 @@ def main(_):
         input_file=predict_file,
         seq_length=FLAGS.max_seq_length,
         is_training=False,
-        drop_remainder=predict_drop_remainder)
+        drop_remainder=predict_drop_remainder,
+        max_token_length=FLAGS.max_token_length)
 
     result = estimator.predict(input_fn=predict_input_fn)
 
