@@ -43,12 +43,13 @@ class BidirectionalLanguageModel(object):
         with open(options_file, 'r') as fin:
             options = json.load(fin)
 
-        if not use_character_inputs:
-            if embedding_weight_file is None:
-                raise ValueError(
-                    "embedding_weight_file is required input with "
-                    "not use_character_inputs"
-                )
+        # Ignore by Winfred
+        # if not use_character_inputs:
+        #     if embedding_weight_file is None:
+        #         raise ValueError(
+        #             "embedding_weight_file is required input with "
+        #             "not use_character_inputs"
+        #         )
 
         self._options = options
         self._weight_file = weight_file
@@ -198,13 +199,18 @@ def _pretrained_initializer(varname, weight_file, embedding_weight_file=None):
                 root + '/LSTMCell/B'
             weight_name_map[root + '/rnn/lstm_cell/projection/kernel'] = \
                 root + '/LSTMCell/W_P_0'
-
+    
+    print(varname)
     # convert the graph name to that in the checkpoint
     varname_in_file = varname[5:]
     if varname_in_file.startswith('RNN'):
         varname_in_file = weight_name_map[varname_in_file]
 
     if varname_in_file == 'embedding':
+        # Add by Winfred
+        if embedding_weight_file is None:
+            embedding_weight_file = weight_file
+        # End
         with h5py.File(embedding_weight_file, 'r') as fin:
             # Have added a special 0 index for padding not present
             # in the original model.
@@ -272,6 +278,12 @@ class BidirectionalLanguageModelGraph(object):
                 self._n_tokens_vocab = fin['embedding'].shape[0] + 1
         else:
             self._n_tokens_vocab = None
+            # Add by Winfred
+            with h5py.File(weight_file, 'r') as fin:
+                if 'embedding' in fin:
+                    self._n_tokens_vocab = fin['embedding'].shape[0] + 1
+            # End
+
 
         with tf.variable_scope('bilm', custom_getter=custom_getter):
             self._build()
@@ -319,7 +331,7 @@ class BidirectionalLanguageModelGraph(object):
         max_chars = cnn_options['max_characters_per_token']
         char_embed_dim = cnn_options['embedding']['dim']
         n_chars = cnn_options['n_characters']
-        if n_chars != 262: # Winfred ? stroke is 267
+        if n_chars != 267: # Winfred ? stroke is 267, orignal is 262
             raise InvalidNumberOfCharacters(
                 "Set n_characters=262 after training see the README.md"
             )

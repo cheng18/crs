@@ -38,6 +38,10 @@ flags.DEFINE_bool(
     "do_elmo", False,
     "")
 
+flags.DEFINE_bool(
+    "do_elmo_token", False,
+    "")
+
 flags.DEFINE_string(
     "elmo_options_file", None,
     "")
@@ -296,7 +300,7 @@ class XnliProcessor(DataProcessor):
   """Processor for the XNLI data set."""
 
   def __init__(self):
-    self.language = "en"
+    self.language = "zh"
 
   def get_train_examples(self, data_dir):
     """See base class."""
@@ -501,7 +505,7 @@ def get_shape_list(tensor, expected_rank=None, name=None):
   return shape
 
 def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels, 
-                 max_seq_length, vocab_size=None, do_elmo=False, 
+                 max_seq_length, vocab_size=None, do_elmo=False, do_elmo_token=False,
                  input_a_char_ids=None, input_b_char_ids=None, 
                  elmo_options_file=None, elmo_weight_file=None,
                  max_token_length=None):
@@ -524,6 +528,17 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
     with tf.variable_scope("", reuse=True):
         # the reuse=True scope reuses weights from the context for the question
         b_embedding = weight_layers("input", b_embeddings_op, l2_coef=0.0)["weighted_op"]
+  elif do_elmo_token:
+    # Build the biLM graph.
+    bilm = BidirectionalLanguageModel(elmo_options_file, elmo_weight_file, 
+                                      use_character_inputs=False)
+    # Get ops to compute the LM embeddings.
+    a_embeddings_op = bilm(input_a_ids) 
+    b_embeddings_op = bilm(input_b_ids) 
+    a_embedding = weight_layers("input", a_embeddings_op, l2_coef=0.0)["weighted_op"]
+    with tf.variable_scope("", reuse=True):
+        # the reuse=True scope reuses weights from the context for the question
+        b_embedding = weight_layers("input", b_embeddings_op, l2_coef=0.0)["weighted_op"]
   else:
     embed = tf.keras.layers.Embedding(vocab_size, 300, input_length=max_seq_length)
     a_embedding = embed(input_a_ids)
@@ -533,7 +548,7 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
   # a_embedding = translate(a_embedding)
   # b_embedding = translate(b_embedding)
 
-  layer_LSTM = tf.keras.layers.CuDNNLSTM(300)
+  layer_LSTM = tf.keras.layers.LSTM(300)
   output_a = layer_LSTM(a_embedding)
   output_b = layer_LSTM(b_embedding)
   output_a = tf.keras.layers.BatchNormalization()(output_a)
@@ -588,7 +603,7 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
 def model_fn_builder(num_labels, init_checkpoint, learning_rate,
                      num_train_steps, num_warmup_steps, use_tpu,
                      use_one_hot_embeddings, vocab_size,
-                     do_elmo, 
+                     do_elmo, do_elmo_token=False,
                      elmo_options_file=None, elmo_weight_file=None,
                      max_seq_length=None, max_token_length=None):
   """Returns `model_fn` closure for TPUEstimator."""
@@ -614,7 +629,7 @@ def model_fn_builder(num_labels, init_checkpoint, learning_rate,
     (total_loss, per_example_loss, logits, probabilities) = create_model(
         is_training, input_a_ids, input_b_ids, label_ids, num_labels, 
         max_seq_length, vocab_size, 
-        do_elmo, input_a_char_ids, input_b_char_ids,
+        do_elmo, do_elmo_token, input_a_char_ids, input_b_char_ids,
         elmo_options_file, elmo_weight_file, max_token_length)
 
     tvars = tf.trainable_variables()
@@ -697,7 +712,7 @@ def main(_):
   tokenizer = Tokenizer(vocab_file=FLAGS.vocab_file, 
                         max_seq_length=FLAGS.max_seq_length, 
                         max_token_length=FLAGS.max_token_length) 
-  vocab_size = 86910 #793471
+  vocab_size = 21097 #793471
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
@@ -734,6 +749,7 @@ def main(_):
       use_one_hot_embeddings=FLAGS.use_tpu,
       vocab_size=vocab_size,
       do_elmo=FLAGS.do_elmo,
+      do_elmo_token=FLAGS.do_elmo_token,
       elmo_options_file=FLAGS.elmo_options_file, 
       elmo_weight_file=FLAGS.elmo_weight_file,
       max_seq_length=FLAGS.max_seq_length,
