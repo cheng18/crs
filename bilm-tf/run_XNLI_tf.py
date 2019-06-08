@@ -50,6 +50,10 @@ flags.DEFINE_string(
     "elmo_weight_file", None,
     "")
 
+flags.DEFINE_string(
+    "stroke_vocab_file", None,
+    "")
+
 flags.DEFINE_integer(
     "max_token_length", None,
     "")
@@ -169,7 +173,8 @@ def printable_text(text):
 
 class Tokenizer(object):
 
-  def __init__(self, vocab_file, max_seq_length, max_token_length=None):
+  def __init__(self, vocab_file, max_seq_length, 
+               max_token_length=None, stroke_vocab_file=None):
     self.vocab_file = vocab_file
     self.max_seq_length = max_seq_length
     self.max_token_length = max_token_length
@@ -177,7 +182,10 @@ class Tokenizer(object):
     max_seq_length = self.max_seq_length - 2 # 因會加 <bos> and <eos>，所以 -2
     self.token_batcher = TokenBatcher(self.vocab_file, max_seq_length)
     if max_token_length:
-      self.batcher = Batcher(self.vocab_file, self.max_token_length, max_seq_length)
+      self.batcher = Batcher(self.vocab_file, 
+                             self.max_token_length, 
+                             max_seq_length,
+                             stroke_vocab_file)
 
   def tokenize(self, text):
     """
@@ -711,7 +719,8 @@ def main(_):
 
   tokenizer = Tokenizer(vocab_file=FLAGS.vocab_file, 
                         max_seq_length=FLAGS.max_seq_length, 
-                        max_token_length=FLAGS.max_token_length) 
+                        max_token_length=FLAGS.max_token_length,
+                        stroke_vocab_file=FLAGS.stroke_vocab_file) 
   vocab_size = 21097 #793471
 
   tpu_cluster_resolver = None
