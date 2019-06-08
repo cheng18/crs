@@ -257,7 +257,7 @@ class Batcher(object):
         '''
         n_sentences = len(sentences)
         if self._max_seq_length is None: # Add by Winfred
-            max_length = max(len(sentence) for sentence in sentences) + 2 # ？ Why + 2
+            max_length = max(len(sentence) for sentence in sentences) + 2 # ？ Why + 2, line 288
         else:
             max_length = self._max_seq_length + 2 # Add by Winfred
 
