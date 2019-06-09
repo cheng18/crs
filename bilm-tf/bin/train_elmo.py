@@ -18,23 +18,23 @@ def main(args):
     n_gpus = 1
 
     # number of tokens in training data (this for 1B Word Benchmark)
-    n_train_tokens = 4000000 # 768648884
+    n_train_tokens = 10000000 # 768648884
 
     options = {
      'bidirectional': True,
 
-     'char_cnn': {'activation': 'relu',
-      'embedding': {'dim': 16},
-      'filters': [[1, 32],
-       [2, 32],
-       [3, 64],
-       [4, 128],
-       [5, 256],
-       [6, 512],
-       [7, 1024]],
-      'max_characters_per_token': 50,
-      'n_characters': 266, # 原261 + 筆畫5
-      'n_highway': 2},
+    #  'char_cnn': {'activation': 'relu',
+    #   'embedding': {'dim': 16},
+    #   'filters': [[1, 32],
+    #    [2, 32],
+    #    [3, 64],
+    #    [4, 128],
+    #    [5, 256],
+    #    [6, 512],
+    #    [7, 1024]],
+    #   'max_characters_per_token': 50,
+    #   'n_characters': 266, # 原261 + 筆畫5
+    #   'n_highway': 2},
     
      'dropout': 0.1,
     
@@ -62,7 +62,8 @@ def main(args):
 
     tf_save_dir = args.save_dir
     tf_log_dir = args.save_dir
-    train(options, data, n_gpus, tf_save_dir, tf_log_dir)
+    train(options, data, n_gpus, tf_save_dir, tf_log_dir,
+          restart_ckpt_file=args.restart_ckpt_file)
 
 
 if __name__ == '__main__':
@@ -71,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--vocab_file', help='Vocabulary file')
     parser.add_argument('--train_prefix', help='Prefix for train files')
     parser.add_argument('--stroke_vocab_file', help='')
+    parser.add_argument('--restart_ckpt_file', help='')
 
     args = parser.parse_args()
     main(args)
