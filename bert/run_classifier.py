@@ -254,6 +254,8 @@ class XnliProcessor(DataProcessor):
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
 
+  # get_test_examples
+
   def get_labels(self):
     """See base class."""
     return ["contradiction", "entailment", "neutral"]

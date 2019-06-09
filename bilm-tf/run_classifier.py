@@ -1,5 +1,7 @@
 '''
-
+比較 無 ELMo、ELMo、ELMo+S 差異
+下有任務爲兩句輸入分類：XNLI、LCQMC
+分類模型：兩句各別丟 LSTM 接着 concat 後丟三層全連接
 '''
 from bilm.data import tokenize_chinese_chars
 from bilm import Batcher, BidirectionalLanguageModel, weight_layers, TokenBatcher
@@ -26,14 +28,13 @@ flags.DEFINE_string(
 flags.DEFINE_string("task_name", None, "The name of the task to train.")
 
 flags.DEFINE_string("vocab_file", None,
-                    "The vocabulary file that the BERT model was trained on.")
+                    "The vocabulary file that the ELMo model was trained on.")
 
 flags.DEFINE_string(
     "output_dir", None,
     "The output directory where the model checkpoints will be written.")
 
-## Other parameters
-
+## ELMo parameters
 flags.DEFINE_bool(
     "do_elmo", False,
     "")
@@ -58,17 +59,19 @@ flags.DEFINE_integer(
     "max_token_length", None,
     "")
 
-flags.DEFINE_bool(
-    "dont_train_tfrecord", False,
-    "")
+## Other parameters
+flags.DEFINE_integer(
+    "vocab_size", 21097,
+    "若不使用 ELMo，則必須給值。"
+    "ELMo 的 options.json 有 vocab_size，所以不使用時，需另外給。")
 
 flags.DEFINE_string(
-    "init_checkpoint", None,
+    "init_checkpoint", None,  # 目前沒用到
     "Initial checkpoint.")
 
 flags.DEFINE_integer(
-    "max_seq_length", 128,
-    "The maximum total input sequence length after WordPiece tokenization. "
+    "max_seq_length", 50,
+    "The maximum total input sequence length after tokenization. "
     "Sequences longer than this will be truncated, and sequences shorter "
     "than this will be padded.")
 
@@ -128,6 +131,10 @@ flags.DEFINE_integer(
     "num_tpu_cores", 8,
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
+flags.DEFINE_bool(
+    "dont_train_tfrecord", False,
+    "若已經有 train_tfrecord，不需要建")
+
 
 def convert_to_unicode(text):
   """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
@@ -147,6 +154,7 @@ def convert_to_unicode(text):
       raise ValueError("Unsupported string type: %s" % (type(text)))
   else:
     raise ValueError("Not running on Python2 or Python 3?")
+
 
 def printable_text(text):
   """Returns text encoded in a way suitable for print or `tf.logging`."""
@@ -204,9 +212,14 @@ class Tokenizer(object):
     return self.token_batcher.batch_sentences([tokens])[0]
 
   def convert_tokens_to_char_ids(self, tokens):
-    char_ids = self.batcher.batch_sentences([tokens])[0]
+    """
+    tokens: tokenize(text)
+    return: shape [max_seq_length * max_token_length]
+    """
+    # char_ids [max_seq_length, max_token_length]
+    char_ids = self.batcher.batch_sentences([tokens])[0] 
+    # flat_char_ids [max_seq_length * max_token_length]
     flat_char_ids = [char_id for sublist in char_ids for char_id in sublist]
-    # flat_char_ids = tf.reshape(char_ids, [-1])
     return flat_char_ids
 
   def _is_punctuation(self, char):
@@ -263,6 +276,7 @@ class InputExample(object):
     self.text_b = text_b
     self.label = label
 
+
 class InputFeatures(object):
   """A single set of features of data."""
 
@@ -273,6 +287,7 @@ class InputFeatures(object):
     self.label_id = label_id
     self.input_a_char_ids = input_a_char_ids
     self.input_b_char_ids = input_b_char_ids
+
 
 class DataProcessor(object):
   """Base class for data converters for sequence classification data sets."""
@@ -347,9 +362,50 @@ class XnliProcessor(DataProcessor):
           InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
     return examples
 
+  # get_test_examples
+
   def get_labels(self):
     """See base class."""
     return ["contradiction", "entailment", "neutral"]
+
+
+class LcqmcProcessor(DataProcessor):
+  """Processor for the LCQMC data set."""
+
+  def get_train_examples(self, data_dir):
+    """See base class."""
+    data_dir = os.path.join(data_dir, "LCQMC_train.json")
+    return self._create_examples(data_dir, "train")
+
+  def get_dev_examples(self, data_dir):
+    """See base class."""
+    data_dir = os.path.join(data_dir, "LCQMC_dev.json")
+    return self._create_examples(data_dir, "dev")
+
+  def get_test_examples(self, data_dir):
+    """See base class."""
+    data_dir = os.path.join(data_dir, "LCQMC_test.json")
+    return self._create_examples(data_dir, "test")
+
+  def get_labels(self):
+    """See base class."""
+    return ["0", "1"]
+
+  def _create_examples(self, data_dir, set_type):
+    """Creates examples for the training and dev sets."""
+    examples = []
+    with tf.gfile.Open(data_dir, 'r') as f:
+      lines = f.readlines()
+      for line in lines:
+        example = json.loads(line)
+        guid = "%s-%s" % (set_type, convert_to_unicode(example["ID"]))
+        text_a = convert_to_unicode(example["sentence1"])
+        text_b = convert_to_unicode(example["sentence2"])
+        label = convert_to_unicode(example["gold_label"])
+        examples.append(
+            InputExample(guid=guid, text_a=text_a, text_b=text_b, label=label))
+    return examples
+    
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
                            tokenizer, max_token_length=None):
@@ -476,41 +532,6 @@ def file_based_input_fn_builder(input_file, seq_length, is_training,
 
   return input_fn
 
-def get_shape_list(tensor, expected_rank=None, name=None):
-  """Returns a list of the shape of tensor, preferring static dimensions.
-
-  Args:
-    tensor: A tf.Tensor object to find the shape of.
-    expected_rank: (optional) int. The expected rank of `tensor`. If this is
-      specified and the `tensor` has a different rank, and exception will be
-      thrown.
-    name: Optional name of the tensor for the error message.
-
-  Returns:
-    A list of dimensions of the shape of tensor. All static dimensions will
-    be returned as python integers, and dynamic dimensions will be returned
-    as tf.Tensor scalars.
-  """
-  if name is None:
-    name = tensor.name
-
-  if expected_rank is not None:
-    assert_rank(tensor, expected_rank, name)
-
-  shape = tensor.shape.as_list()
-
-  non_static_indexes = []
-  for (index, dim) in enumerate(shape):
-    if dim is None:
-      non_static_indexes.append(index)
-
-  if not non_static_indexes:
-    return shape
-
-  dyn_shape = tf.shape(tensor)
-  for index in non_static_indexes:
-    shape[index] = dyn_shape[index]
-  return shape
 
 def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels, 
                  max_seq_length, vocab_size=None, do_elmo=False, do_elmo_token=False,
@@ -524,7 +545,8 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
   if do_elmo:
     # Build the biLM graph.
     bilm = BidirectionalLanguageModel(elmo_options_file, elmo_weight_file)
-    # reshape
+    # Reshape [batch_size, max_seq_length * max_token_length] to 
+    #         [batch_size, max_seq_length, max_token_length]
     input_a_char_ids = tf.reshape(input_a_char_ids, 
         [batch_size, max_seq_length, max_token_length])
     input_b_char_ids = tf.reshape(input_b_char_ids, 
@@ -695,6 +717,73 @@ def model_fn_builder(num_labels, init_checkpoint, learning_rate,
   return model_fn
 
 
+def get_shape_list(tensor, expected_rank=None, name=None):
+  """Returns a list of the shape of tensor, preferring static dimensions.
+
+  Args:
+    tensor: A tf.Tensor object to find the shape of.
+    expected_rank: (optional) int. The expected rank of `tensor`. If this is
+      specified and the `tensor` has a different rank, and exception will be
+      thrown.
+    name: Optional name of the tensor for the error message.
+
+  Returns:
+    A list of dimensions of the shape of tensor. All static dimensions will
+    be returned as python integers, and dynamic dimensions will be returned
+    as tf.Tensor scalars.
+  """
+  if name is None:
+    name = tensor.name
+
+  if expected_rank is not None:
+    assert_rank(tensor, expected_rank, name)
+
+  shape = tensor.shape.as_list()
+
+  non_static_indexes = []
+  for (index, dim) in enumerate(shape):
+    if dim is None:
+      non_static_indexes.append(index)
+
+  if not non_static_indexes:
+    return shape
+
+  dyn_shape = tf.shape(tensor)
+  for index in non_static_indexes:
+    shape[index] = dyn_shape[index]
+  return shape
+
+
+def assert_rank(tensor, expected_rank, name=None):
+  """Raises an exception if the tensor rank is not of the expected rank.
+
+  Args:
+    tensor: A tf.Tensor to check the rank of.
+    expected_rank: Python integer or list of integers, expected rank.
+    name: Optional name of the tensor for the error message.
+
+  Raises:
+    ValueError: If the expected shape doesn't match the actual shape.
+  """
+  if name is None:
+    name = tensor.name
+
+  expected_rank_dict = {}
+  if isinstance(expected_rank, six.integer_types):
+    expected_rank_dict[expected_rank] = True
+  else:
+    for x in expected_rank:
+      expected_rank_dict[x] = True
+
+  actual_rank = tensor.shape.ndims
+  if actual_rank not in expected_rank_dict:
+    scope_name = tf.get_variable_scope().name
+    raise ValueError(
+        "For the tensor `%s` in scope `%s`, the actual rank "
+        "`%d` (shape = %s) is not equal to the expected rank `%s`" %
+        (name, scope_name, actual_rank, str(tensor.shape), str(expected_rank)))
+
+
 def main(_):
   tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -721,7 +810,6 @@ def main(_):
                         max_seq_length=FLAGS.max_seq_length, 
                         max_token_length=FLAGS.max_token_length,
                         stroke_vocab_file=FLAGS.stroke_vocab_file) 
-  vocab_size = 21097 #793471
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
@@ -756,7 +844,7 @@ def main(_):
       num_warmup_steps=num_warmup_steps,
       use_tpu=FLAGS.use_tpu,
       use_one_hot_embeddings=FLAGS.use_tpu,
-      vocab_size=vocab_size,
+      vocab_size=FLAGS.vocab_size,
       do_elmo=FLAGS.do_elmo,
       do_elmo_token=FLAGS.do_elmo_token,
       elmo_options_file=FLAGS.elmo_options_file, 
@@ -866,5 +954,8 @@ def main(_):
 
 
 if __name__ == "__main__":
-#   flags.mark_flag_as_required("data_dir")
+  flags.mark_flag_as_required("data_dir")
+  flags.mark_flag_as_required("task_name")
+  flags.mark_flag_as_required("vocab_file")
+  flags.mark_flag_as_required("output_dir")
   tf.app.run()

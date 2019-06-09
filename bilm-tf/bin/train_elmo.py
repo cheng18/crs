@@ -23,18 +23,18 @@ def main(args):
     options = {
      'bidirectional': True,
 
-    #  'char_cnn': {'activation': 'relu',
-    #   'embedding': {'dim': 16},
-    #   'filters': [[1, 32],
-    #    [2, 32],
-    #    [3, 64],
-    #    [4, 128],
-    #    [5, 256],
-    #    [6, 512],
-    #    [7, 1024]],
-    #   'max_characters_per_token': 50,
-    #   'n_characters': 266, # 原261 + 筆畫5
-    #   'n_highway': 2},
+     'char_cnn': {'activation': 'relu',
+      'embedding': {'dim': 16},
+      'filters': [[1, 32],
+       [2, 32],
+       [3, 64],
+       [4, 128],
+       [5, 256],
+       [6, 512],
+       [7, 1024]],
+      'max_characters_per_token': 50,
+      'n_characters': 266, # 原261 + 筆畫5
+      'n_highway': 2},
     
      'dropout': 0.1,
     
