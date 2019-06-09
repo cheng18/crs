@@ -1,8 +1,8 @@
-'''
+"""
 比較 無 ELMo、ELMo、ELMo+S 差異
 下有任務爲兩句輸入分類：XNLI、LCQMC
 分類模型：兩句各別丟 LSTM 接着 concat 後丟三層全連接
-'''
+"""
 from bilm.data import tokenize_chinese_chars
 from bilm import Batcher, BidirectionalLanguageModel, weight_layers, TokenBatcher
 import collections
