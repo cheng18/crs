@@ -18,23 +18,23 @@ def main(args):
     n_gpus = 1
 
     # number of tokens in training data (this for 1B Word Benchmark)
-    n_train_tokens = 10000000 # 768648884
+    n_train_tokens = 300000 # 768648884
 
     options = {
      'bidirectional': True,
 
-     'char_cnn': {'activation': 'relu',
-      'embedding': {'dim': 16},
-      'filters': [[1, 32],
-       [2, 32],
-       [3, 64],
-       [4, 128],
-       [5, 256],
-       [6, 512],
-       [7, 1024]],
-      'max_characters_per_token': 50,
-      'n_characters': 266, # 原261 + 筆畫5
-      'n_highway': 2},
+    #  'char_cnn': {'activation': 'relu',
+    #   'embedding': {'dim': 16},
+    #   'filters': [[1, 32],
+    #    [2, 32],
+    #    [3, 64],
+    #    [4, 128],
+    #    [5, 256],
+    #    [6, 512],
+    #    [7, 1024]],
+    #   'max_characters_per_token': 50,
+    #   'n_characters': 266, # 原261 + 筆畫5
+    #   'n_highway': 2},\
     
      'dropout': 0.1,
     
@@ -58,7 +58,10 @@ def main(args):
 
     prefix = args.train_prefix
     data = BidirectionalLMDataset(prefix, vocab, test=False,
-                                      shuffle_on_load=True)
+                                      shuffle_on_load=True,
+                                      do_record=args.do_record,       # Add by Winfred
+                                      records_path=args.records_path, # Add by Winfred
+                                      vocab_file=args.vocab_file)     # Add by Winfred
 
     tf_save_dir = args.save_dir
     tf_log_dir = args.save_dir
@@ -73,6 +76,8 @@ if __name__ == '__main__':
     parser.add_argument('--train_prefix', help='Prefix for train files')
     parser.add_argument('--stroke_vocab_file', help='')
     parser.add_argument('--restart_ckpt_file', help='')
+    parser.add_argument('--do_record', help='')
+    parser.add_argument('--records_path', help='')
 
     args = parser.parse_args()
     main(args)

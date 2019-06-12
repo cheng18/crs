@@ -894,6 +894,7 @@ def train(options, data, n_gpus, tf_save_dir, tf_log_dir,
             if batch_no == n_batches_total:
                 # done training!
                 break
+        data.save_recorder() # Add by Winfred
 
 
 def clip_by_global_norm_summary(t_list, clip_norm, norm_name, variables):

@@ -543,6 +543,12 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
   batch_size = input_shape[0]
 
   if do_elmo:
+    assert input_a_char_ids is not None
+    assert input_b_char_ids is not None
+    assert elmo_options_file is not None
+    assert elmo_weight_file is not None
+    assert max_token_length is not None
+
     # Build the biLM graph.
     bilm = BidirectionalLanguageModel(elmo_options_file, elmo_weight_file)
     # Reshape [batch_size, max_seq_length * max_token_length] to 
@@ -558,7 +564,11 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
     with tf.variable_scope("", reuse=True):
         # the reuse=True scope reuses weights from the context for the question
         b_embedding = weight_layers("input", b_embeddings_op, l2_coef=0.0)["weighted_op"]
+
   elif do_elmo_token:
+    assert elmo_options_file is not None
+    assert elmo_weight_file is not None
+
     # Build the biLM graph.
     bilm = BidirectionalLanguageModel(elmo_options_file, elmo_weight_file, 
                                       use_character_inputs=False)
@@ -569,7 +579,10 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
     with tf.variable_scope("", reuse=True):
         # the reuse=True scope reuses weights from the context for the question
         b_embedding = weight_layers("input", b_embeddings_op, l2_coef=0.0)["weighted_op"]
+
   else:
+    assert vocab_size is not None
+
     embed = tf.keras.layers.Embedding(vocab_size, 300, input_length=max_seq_length)
     a_embedding = embed(input_a_ids)
     b_embedding = embed(input_b_ids)
@@ -587,19 +600,22 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
   output = tf.keras.layers.concatenate([output_a, output_b], axis=-1) # ?
   output = tf.keras.layers.Dropout(0.2)(output)
 
-  output = tf.keras.layers.Dense(600, 
-                                  activation='relu', 
-                                  kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
+  output = tf.keras.layers.Dense(
+      600, 
+      activation='relu', 
+      kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
   output = tf.keras.layers.Dropout(0.2)(output)
   output = tf.keras.layers.BatchNormalization()(output)
-  output = tf.keras.layers.Dense(600, 
-                                  activation='relu', 
-                                  kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
+  output = tf.keras.layers.Dense(
+      600, 
+      activation='relu', 
+      kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
   output = tf.keras.layers.Dropout(0.2)(output)
   output = tf.keras.layers.BatchNormalization()(output)
-  output = tf.keras.layers.Dense(600, 
-                                  activation='relu', 
-                                  kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
+  output = tf.keras.layers.Dense(
+      600, 
+      activation='relu', 
+      kernel_regularizer=tf.keras.regularizers.l2(4e-6))(output)
   output = tf.keras.layers.Dropout(0.2)(output)
   output = tf.keras.layers.BatchNormalization()(output)
 
@@ -788,7 +804,8 @@ def main(_):
   tf.logging.set_verbosity(tf.logging.INFO)
 
   processors = {
-      "xnli": XnliProcessor
+      "xnli": XnliProcessor,
+      "lcqmc": LcqmcProcessor
   }
 
   if not FLAGS.do_train and not FLAGS.do_eval and not FLAGS.do_predict:

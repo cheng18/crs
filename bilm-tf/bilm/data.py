@@ -7,6 +7,8 @@ import numpy as np
 from typing import List
 
 import csv
+import json
+import os
 
 class Vocabulary(object):
     '''
@@ -376,7 +378,8 @@ class LMDataset(object):
         per line.  Each sentence is pre-tokenized and white space joined.
     """
     def __init__(self, filepattern, vocab, reverse=False, test=False,
-                 shuffle_on_load=False):
+                 shuffle_on_load=False,
+                 do_record=False, records_path=None, vocab_file=None): # Add by Winfred
         '''
         filepattern = a glob string that specifies the list of files.
         vocab = an instance of Vocabulary or UnicodeCharsVocabulary
@@ -394,6 +397,14 @@ class LMDataset(object):
         self._test = test
         self._shuffle_on_load = shuffle_on_load
         self._use_char_inputs = hasattr(vocab, 'encode_chars')
+
+        # Add by Winfred
+        self.recorder = None
+        if do_record:
+            assert records_path is not None
+            assert vocab_file is not None
+            self.recorder = Recorder(records_path, vocab_file)
+        # End
 
         self._ids = self._load_random_shard()
 
@@ -435,6 +446,7 @@ class LMDataset(object):
         print('Loading data from: %s' % shard_name)
         with open(shard_name) as f:
             sentences_raw = f.readlines()
+        print('Loading ok') # Add by Winfred
 
         sentences_raw = [tokenize_chinese_chars(sentence) for sentence in sentences_raw] # Winfred 中文加空格
         
@@ -449,6 +461,15 @@ class LMDataset(object):
 
         if self._shuffle_on_load:
             random.shuffle(sentences)
+            print('shuffled') # Add by Winfred
+        print('shuffle ok') # Add by Winfred
+
+        # Add by Winfred
+        if self.recorder is not None:
+            self.recorder.save_sentences(sentences)
+            print('recorder save_sentences') # Add by Winfred
+        print('recorder ok') # Add by Winfred
+        # End
 
         ids = [self.vocab.encode(sentence, self._reverse)
                for sentence in sentences]
@@ -468,6 +489,10 @@ class LMDataset(object):
                 self._ids = self._load_random_shard()
             ret = self._ids[self._i]
             self._i += 1
+            # Add by Winfred
+            if self.recorder is not None:
+                self.recorder.i_add_one()
+            # End
             yield ret
 
     @property
@@ -491,13 +516,15 @@ class LMDataset(object):
         return self._vocab
 
 class BidirectionalLMDataset(object):
-    def __init__(self, filepattern, vocab, test=False, shuffle_on_load=False):
+    def __init__(self, filepattern, vocab, test=False, shuffle_on_load=False,
+                 do_record=False, records_path=None, vocab_file=None): # Add by Winfred
         '''
         bidirectional version of LMDataset
         '''
         self._data_forward = LMDataset(
             filepattern, vocab, reverse=False, test=test,
-            shuffle_on_load=shuffle_on_load)
+            shuffle_on_load=shuffle_on_load,
+            do_record=do_record, records_path=records_path, vocab_file=vocab_file) # Add by Winfred
         self._data_reverse = LMDataset(
             filepattern, vocab, reverse=True, test=test,
             shuffle_on_load=shuffle_on_load)
@@ -516,6 +543,12 @@ class BidirectionalLMDataset(object):
                 X[k + '_reverse'] = v
 
             yield X
+
+    # Add by Winfred
+    def save_recorder(self):
+        if self._data_forward.recorder is not None:
+            self._data_forward.recorder.run_record()
+    # End
 
 
 class InvalidNumberOfCharacters(Exception):
@@ -573,3 +606,56 @@ def tokenize_chinese_chars(text):
         else:
             output.append(char) 
     return "".join(output)
+
+
+class Recorder(object):
+    """
+    記錄 pre-training dataset 與 vocab 的關係，瞭解哪些字詞沒預訓練到。
+    輸出 record.json = {"vocab_words": counts, 
+                       "UNK_list": {"UNKs": counts}}
+    """
+    def __init__(self, records_path, vocab_file):
+        self.records_path = records_path
+        self.vocab_file = vocab_file
+        self.records_file = os.path.join(self.records_path, "records.json")
+        self.sentences_temp_file = os.path.join(self.records_path, "sentences_temp")
+        self.i = 0
+        
+        print("Recorder init")
+    
+    def _load_vocab_to_records(self):
+        records = {"UNK_list": {}}
+        with open(self.vocab_file) as lines:
+            for line in lines:
+                line = line.strip()
+                records[line] = 0
+        return records
+
+    def _record_sentences(self, records, sentences):
+        for sentence in sentences[:self.i+1]:
+            for token in sentence.split():
+                if token in records:
+                    records[token] += 1
+                else:
+                    records["<UNK>"] += 1
+                    if token in records["UNK_list"]:
+                        records["UNK_list"][token] += 1
+                    else:
+                        records["UNK_list"][token] = 1
+        return records
+    
+    def i_add_one(self):
+        self.i += 1
+
+    def save_sentences(self, sentences):
+        with open(self.sentences_temp_file, "a") as f:
+            f.writelines(sentences)
+    
+    def run_record(self):
+        records = self._load_vocab_to_records()
+        with open(self.sentences_temp_file, "r") as f:
+            sentences = f.readlines()
+        records = self._record_sentences(records, sentences)
+        json_str = json.dumps(records, ensure_ascii=False)
+        with open(self.records_file, "w", encoding='utf8') as f:
+            f.write(json_str)
