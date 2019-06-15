@@ -94,7 +94,7 @@ def load_stroke_vocab(stroke_vocab_file):
 
     stroke_vocab = {}
     for row in reader:
-      stroke_vocab[row[char_index]] = row[stroke_index]
+      stroke_vocab[row[char_index]] = list(map(int, row[stroke_index]))
 
   return stroke_vocab
 # end
@@ -383,21 +383,25 @@ class StrokeTokenizer(object):
     strokes = []
     if token in self.stroke_vocab:
       strokes = self.stroke_vocab[token]
-      strokes = map(lambda s: "###" + s, strokes)
+      strokes = map(lambda s: "###" + str(s), strokes)
       strokes = list(strokes)
     
     return strokes
 
   def convert_tokens_to_stroke_ids(self, tokens, max_stroke_length=32): # model 用
+    # 開始、結束、padding
+    start = 6
+    end = 7
+    padding = 8
     output = []
     for token in tokens:
-      strokes = []
+      strokes = [start]
       if token in self.stroke_vocab:
-        strokes = self.stroke_vocab[token]
-        strokes = list(strokes)[:max_stroke_length]
-        strokes = list(map(int, strokes))
+        strokes.extend(self.stroke_vocab[token])
+      strokes = strokes[:max_stroke_length-1]
+      strokes.append(end)
       while len(strokes) < max_stroke_length:
-        strokes.append(0)
+        strokes.append(padding)
       output.extend(strokes)
     return output
 # end

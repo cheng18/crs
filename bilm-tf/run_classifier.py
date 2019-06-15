@@ -356,13 +356,15 @@ class DataProcessor(object):
 class XnliProcessor(DataProcessor):
   """Processor for the XNLI data set."""
 
-  def __init__(self, sim_tran):
+  def __init__(self, sim_tran=None):
     self.language = "zh"
 
     if sim_tran == "sim":
       self.sim_tran = "_s"
     elif sim_tran == "tran":
       self.sim_tran = "_t"
+    else:
+      self.sim_tran = ""
     print("self.sim_tran", self.sim_tran)
 
   def get_train_examples(self, data_dir):
@@ -412,11 +414,13 @@ class XnliProcessor(DataProcessor):
 
 class LcqmcProcessor(DataProcessor):
   """Processor for the LCQMC data set."""
-  def __init__(self, sim_tran):
+  def __init__(self, sim_tran=None):
     if sim_tran == "sim":
       self.sim_tran = "_s"
     elif sim_tran == "tran":
       self.sim_tran = "_t"
+    else:
+      self.sim_tran = ""
     print("self.sim_tran", self.sim_tran)
 
   def get_train_examples(self, data_dir):

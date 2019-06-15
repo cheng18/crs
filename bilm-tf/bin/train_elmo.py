@@ -38,7 +38,7 @@ def main(args):
        [7, 1024]],
       'max_characters_per_token': max_token_length,
       'n_characters': 266, # 原261 + 筆畫5
-      'n_highway': 2},
+      'n_highway': 2}, # 2
     
      'dropout': 0.1,
     

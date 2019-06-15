@@ -565,8 +565,7 @@ def embedding_stroke_cnn(input_tensor,
     outputs = []
     for i, (window, filters) in enumerate(stroke_windows_filters):
       with tf.variable_scope("cnn%s" % i):
-        conv = tf.layers.conv2d(
-            input_strokes,
+        conv = tf.keras.layers.Conv2D(
             filters=filters,
             kernel_size=[1, window],
             strides=(1, 1),
@@ -574,27 +573,29 @@ def embedding_stroke_cnn(input_tensor,
             data_format='channels_last',
             dilation_rate=(1, 1),
             activation=tf.nn.relu,
-            kernel_initializer=create_initializer(initializer_range)) # name ?
-        conv = tf.layers.max_pooling2d(
-            conv,
+            kernel_initializer=create_initializer(initializer_range))
+        output_conv = conv(input_strokes)
+        max_pooling = tf.keras.layers.MaxPool2D(
             pool_size=[1, stroke_length-window+1],
             strides=[1, stroke_length-window+1], # ?
             padding='valid',
-            data_format='channels_last') # name ?
+            data_format='channels_last')
+        output_conv = max_pooling(output_conv)
         # conv shape [batch_size, seq_length, 1, embedding]
-        conv = tf.squeeze(conv, axis=[2])
+        output_conv = tf.squeeze(output_conv, axis=[2])
         # conv shape [batch_size, seq_length, embedding] 
-        outputs.append(conv)
-    outputs = tf.concat(outputs, 2)
+        outputs.append(output_conv)
+    output = tf.concat(outputs, 2)
 
     with tf.variable_scope("output"):
-      output = tf.layers.dense(
-          inputs=outputs,
+      projection = tf.keras.layers.Dense(
           units=width,
           activation=tf.nn.relu,
           kernel_initializer=create_initializer(initializer_range))
+      output = projection(output)
 
-  output = layer_norm_and_dropout(output, dropout_prob)
+  # output = layer_norm_and_dropout(output, dropout_prob)
+  # highway?
 # ------------------CNN-----------------end
   return output
 # end

@@ -273,7 +273,7 @@ class Batcher(object):
                 sent = sent[:self._max_seq_length] # Add by Winfred
             length = len(sent) + 2
             char_ids_without_mask = self._lm_vocab.encode_chars(
-                sent, split=False) # Winfred 將加筆畫？
+                sent, split=False)
             # add one so that 0 is the mask value
             X_char_ids[k, :length, :] = char_ids_without_mask + 1
 
