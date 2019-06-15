@@ -1,3 +1,7 @@
+"""
+Pre-training dataset preprocessing.
+輸出：未轉簡繁、轉簡體(_s)、轉繁體(_t)
+"""
 import tensorflow as tf
 import unicodedata
 import six
@@ -13,7 +17,7 @@ flags.DEFINE_string("input_file", None,
 
 flags.DEFINE_string(
     "output_file", None,
-    "Output TF example file (or comma-separated list of files).")
+    "Output file (or comma-separated list of files).")
 
 def convert_to_unicode(text):
   """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
@@ -65,7 +69,9 @@ def main(_):
   for input_file in input_files:
     tf.logging.info("  %s", input_file)
   
-  lines = []
+  lines = []   # 未轉
+  lines_s = [] # 簡體
+  lines_t = [] # 繁體
   for input_file in input_files:
     with tf.gfile.GFile(input_file, "r") as reader:
       while True:
@@ -74,32 +80,24 @@ def main(_):
           break
         if is_non_content(line):
           continue
-        line = opencc.convert(line, config="t2s.json")
         # line = extract_chinese(line)
         lines.append(line)
+        lines_s.append(opencc.convert(line, config="t2s.json"))
+        lines_t.append(opencc.convert(line, config="s2t.json"))
         
   output_files = FLAGS.output_file.split(",")
   tf.logging.info("*** Writing to output files ***")
   for output_file in output_files:
     tf.logging.info("  %s", output_file)
 
-  with tf.gfile.GFile(output_file, "w") as writer:
-      writer.write(''.join(lines))
+  with tf.gfile.GFile(output_file, "w") as f:
+      f.write(''.join(lines))
+  with tf.gfile.GFile(output_file + "_s", "w") as f:
+      f.write(''.join(lines_s))
+  with tf.gfile.GFile(output_file + "_t", "w") as f:
+      f.write(''.join(lines_t))
 
 if __name__ == "__main__":
   flags.mark_flag_as_required("input_file")
   flags.mark_flag_as_required("output_file")
   tf.app.run()
-
-# import os
-# from os import walk
-# from os.path import join
-#   input_files = []
-#   if os.path.isdir(FLAGS.input_file): # 若是資料集，則巡迴所有絕對路徑
-#     for root, dirs, files in walk(FLAGS.input_file):
-#       for f in files:
-#         fullpath = join(root, f)
-#         input_files.extend(tf.gfile.Glob(fullpath))
-#   else: # 否則按照原code
-#     for input_pattern in FLAGS.input_file.split(","):
-#       input_files.extend(tf.gfile.Glob(input_pattern))

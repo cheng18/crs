@@ -8,33 +8,37 @@ from bilm.data import BidirectionalLMDataset
 
 
 def main(args):
+    max_token_length = int(args.max_token_length)
+
     # load the vocab
-    # vocab = load_vocab(args.vocab_file, 50) # Winfred stroke_vocab
+    # vocab = load_vocab(args.vocab_file, 50) 
     print(args.stroke_vocab_file)
-    vocab = load_vocab(args.vocab_file, args.stroke_vocab_file, 50) # Winfred stroke_vocab
+    vocab = load_vocab(args.vocab_file, 
+                       args.stroke_vocab_file, # Winfred stroke_vocab
+                       max_token_length) # Winfred stroke_vocab
 
     # define the options
     batch_size = 128  # batch size for each GPU
     n_gpus = 1
 
     # number of tokens in training data (this for 1B Word Benchmark)
-    n_train_tokens = 300000 # 768648884
+    n_train_tokens = 10731134 # 768648884
 
     options = {
      'bidirectional': True,
 
-    #  'char_cnn': {'activation': 'relu',
-    #   'embedding': {'dim': 16},
-    #   'filters': [[1, 32],
-    #    [2, 32],
-    #    [3, 64],
-    #    [4, 128],
-    #    [5, 256],
-    #    [6, 512],
-    #    [7, 1024]],
-    #   'max_characters_per_token': 50,
-    #   'n_characters': 266, # 原261 + 筆畫5
-    #   'n_highway': 2},\
+     'char_cnn': {'activation': 'relu',
+      'embedding': {'dim': 16},
+      'filters': [[1, 32],
+       [2, 32],
+       [3, 64],
+       [4, 128],
+       [5, 256],
+       [6, 512],
+       [7, 1024]],
+      'max_characters_per_token': max_token_length,
+      'n_characters': 266, # 原261 + 筆畫5
+      'n_highway': 2},
     
      'dropout': 0.1,
     
@@ -48,7 +52,7 @@ def main(args):
     
      'all_clip_norm_val': 10.0,
     
-     'n_epochs': 10,
+     'n_epochs': 1,
      'n_train_tokens': n_train_tokens,
      'batch_size': batch_size,
      'n_tokens_vocab': vocab.size,
@@ -58,7 +62,7 @@ def main(args):
 
     prefix = args.train_prefix
     data = BidirectionalLMDataset(prefix, vocab, test=False,
-                                      shuffle_on_load=True,
+                                      shuffle_on_load=False, # True
                                       do_record=args.do_record,       # Add by Winfred
                                       records_path=args.records_path, # Add by Winfred
                                       vocab_file=args.vocab_file)     # Add by Winfred
@@ -75,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--vocab_file', help='Vocabulary file')
     parser.add_argument('--train_prefix', help='Prefix for train files')
     parser.add_argument('--stroke_vocab_file', help='')
+    parser.add_argument('--max_token_length', help='')
     parser.add_argument('--restart_ckpt_file', help='')
     parser.add_argument('--do_record', help='')
     parser.add_argument('--records_path', help='')

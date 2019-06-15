@@ -644,12 +644,16 @@ class Recorder(object):
                         records["UNK_list"][token] = 1
         return records
     
+    def _count_tokens(self, sentences):
+        return sum([len(sentence.split()) for sentence in sentences])
+    
     def i_add_one(self):
         self.i += 1
 
     def save_sentences(self, sentences):
         with open(self.sentences_temp_file, "a") as f:
             f.writelines(sentences)
+        print("tokens number: %d" % self._count_tokens(sentences))
     
     def run_record(self):
         records = self._load_vocab_to_records()

@@ -10,6 +10,7 @@ import csv
 import numpy as np
 import json
 import os
+import opencc
 import optimization
 import unicodedata
 import six
@@ -58,6 +59,20 @@ flags.DEFINE_string(
 flags.DEFINE_integer(
     "max_token_length", None,
     "")
+
+flags.DEFINE_bool(
+    "sim2tran", False,
+    "簡轉繁，慢，不建議使用")
+
+flags.DEFINE_bool(
+    "tran2sim", False,
+    "繁轉簡，慢，不建議使用")
+
+flags.DEFINE_string(
+    "sim_tran", None,
+    "簡體還是繁體的資料集")
+    
+
 
 ## Other parameters
 flags.DEFINE_integer(
@@ -182,7 +197,8 @@ def printable_text(text):
 class Tokenizer(object):
 
   def __init__(self, vocab_file, max_seq_length, 
-               max_token_length=None, stroke_vocab_file=None):
+               max_token_length=None, stroke_vocab_file=None,
+               tran2sim=False, sim2tran=False):
     self.vocab_file = vocab_file
     self.max_seq_length = max_seq_length
     self.max_token_length = max_token_length
@@ -194,6 +210,23 @@ class Tokenizer(object):
                              self.max_token_length, 
                              max_seq_length,
                              stroke_vocab_file)
+    
+    self.convert_config = None
+    if tran2sim and sim2tran:
+      assert tran2sim != sim2tran
+    elif tran2sim:
+      self.convert_config = "t2s.json"
+    elif sim2tran:
+      self.convert_config = "s2t.json"
+
+  def convert(self, text):
+    """
+    未轉簡繁、轉簡體、轉繁體
+    很慢，不建議使用
+    """
+    if self.convert_config is None:
+      return text
+    return opencc.convert(text, config=self.convert_config)
 
   def tokenize(self, text):
     """
@@ -201,6 +234,7 @@ class Tokenizer(object):
     text=‘Pretrained biLMs compute representations useful for NLP tasks.’
     token=['Pretrained', 'biLMs', 'compute', 'representations', 'useful', 'for', 'NLP', 'tasks', '.']
     """
+    text = self.convert(text)
     text = tokenize_chinese_chars(text)
     text = text.strip()
     tokens = []
@@ -322,14 +356,20 @@ class DataProcessor(object):
 class XnliProcessor(DataProcessor):
   """Processor for the XNLI data set."""
 
-  def __init__(self):
+  def __init__(self, sim_tran):
     self.language = "zh"
+
+    if sim_tran == "sim":
+      self.sim_tran = "_s"
+    elif sim_tran == "tran":
+      self.sim_tran = "_t"
+    print("self.sim_tran", self.sim_tran)
 
   def get_train_examples(self, data_dir):
     """See base class."""
     lines = self._read_tsv(
         os.path.join(data_dir, "XNLI-MT-1.0", "multinli",
-                     "multinli.train.%s.tsv" % self.language))
+                     "multinli.train.%s.tsv" % (self.language + self.sim_tran)))
     examples = []
     for (i, line) in enumerate(lines):
       if i == 0:
@@ -346,7 +386,8 @@ class XnliProcessor(DataProcessor):
 
   def get_dev_examples(self, data_dir):
     """See base class."""
-    lines = self._read_tsv(os.path.join(data_dir, "XNLI-1.0", "xnli.dev.tsv"))
+    lines = self._read_tsv(os.path.join(data_dir, "XNLI-1.0", 
+                           "xnli.dev%s.tsv" % self.sim_tran))
     examples = []
     for (i, line) in enumerate(lines):
       if i == 0:
@@ -371,20 +412,26 @@ class XnliProcessor(DataProcessor):
 
 class LcqmcProcessor(DataProcessor):
   """Processor for the LCQMC data set."""
+  def __init__(self, sim_tran):
+    if sim_tran == "sim":
+      self.sim_tran = "_s"
+    elif sim_tran == "tran":
+      self.sim_tran = "_t"
+    print("self.sim_tran", self.sim_tran)
 
   def get_train_examples(self, data_dir):
     """See base class."""
-    data_dir = os.path.join(data_dir, "LCQMC_train.json")
+    data_dir = os.path.join(data_dir, "LCQMC_train%s.json" % self.sim_tran)
     return self._create_examples(data_dir, "train")
 
   def get_dev_examples(self, data_dir):
     """See base class."""
-    data_dir = os.path.join(data_dir, "LCQMC_dev.json")
+    data_dir = os.path.join(data_dir, "LCQMC_dev%s.json" % self.sim_tran)
     return self._create_examples(data_dir, "dev")
 
   def get_test_examples(self, data_dir):
     """See base class."""
-    data_dir = os.path.join(data_dir, "LCQMC_test.json")
+    data_dir = os.path.join(data_dir, "LCQMC_test%s.json" % self.sim_tran)
     return self._create_examples(data_dir, "test")
 
   def get_labels(self):
@@ -819,14 +866,16 @@ def main(_):
   if task_name not in processors:
     raise ValueError("Task not found: %s" % (task_name))
 
-  processor = processors[task_name]()
+  processor = processors[task_name](FLAGS.sim_tran)
 
   label_list = processor.get_labels()
 
   tokenizer = Tokenizer(vocab_file=FLAGS.vocab_file, 
                         max_seq_length=FLAGS.max_seq_length, 
                         max_token_length=FLAGS.max_token_length,
-                        stroke_vocab_file=FLAGS.stroke_vocab_file) 
+                        stroke_vocab_file=FLAGS.stroke_vocab_file,
+                        sim2tran=FLAGS.sim2tran,
+                        tran2sim=FLAGS.tran2sim) 
 
   tpu_cluster_resolver = None
   if FLAGS.use_tpu and FLAGS.tpu_name:
