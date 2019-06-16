@@ -5,6 +5,7 @@ import numpy as np
 
 from bilm.training import train, load_options_latest_checkpoint, load_vocab
 from bilm.data import BidirectionalLMDataset
+import os
 
 
 def main(args):
@@ -24,41 +25,47 @@ def main(args):
     # number of tokens in training data (this for 1B Word Benchmark)
     n_train_tokens = 10731134 # 768648884
 
-    options = {
-     'bidirectional': True,
+    # options = {
+    #  'bidirectional': True,
 
-     'char_cnn': {'activation': 'relu',
-      'embedding': {'dim': 16},
-      'filters': [[1, 32],
-       [2, 32],
-       [3, 64],
-       [4, 128],
-       [5, 256],
-       [6, 512],
-       [7, 1024]],
-      'max_characters_per_token': max_token_length,
-      'n_characters': 266, # 原261 + 筆畫5
-      'n_highway': 2}, # 2
+    #  'char_cnn': {'activation': 'relu',
+    #   'embedding': {'dim': 16},
+    #   'filters': [[1, 32],
+    #    [2, 32],
+    #    [3, 64],
+    #    [4, 128],
+    #    [5, 256],
+    #    [6, 512],
+    #    [7, 1024]],
+    #   'max_characters_per_token': max_token_length,
+    #   'n_characters': 266, # 原261 + 筆畫5
+    #   'n_highway': 2}, # 2
     
-     'dropout': 0.1,
+    #  'dropout': 0.1,
     
-     'lstm': {
-      'cell_clip': 3,
-      'dim': 4096,
-      'n_layers': 2,
-      'proj_clip': 3,
-      'projection_dim': 512,
-      'use_skip_connections': True},
+    #  'lstm': {
+    #   'cell_clip': 3,
+    #   'dim': 4096,
+    #   'n_layers': 2,
+    #   'proj_clip': 3,
+    #   'projection_dim': 512,
+    #   'use_skip_connections': True},
     
-     'all_clip_norm_val': 10.0,
+    #  'all_clip_norm_val': 10.0,
     
-     'n_epochs': 1,
-     'n_train_tokens': n_train_tokens,
-     'batch_size': batch_size,
-     'n_tokens_vocab': vocab.size,
-     'unroll_steps': 20,
-     'n_negative_samples_batch': 8192,
-    }
+    #  'n_epochs': 1,
+    #  'n_train_tokens': n_train_tokens,
+    #  'batch_size': batch_size,
+    #  'n_tokens_vocab': vocab.size,
+    #  'unroll_steps': 20,
+    #  'n_negative_samples_batch': 8192,
+    # }
+    
+    # Add by Winfred
+    option_file = os.path.join(args.save_dir, "options.json")
+    with open(option_file, "r") as f:
+        options = json.load(f)
+    # End
 
     prefix = args.train_prefix
     data = BidirectionalLMDataset(prefix, vocab, test=False,

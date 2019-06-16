@@ -388,8 +388,11 @@ class StrokeTokenizer(object):
     
     return strokes
 
-  def convert_tokens_to_stroke_ids(self, tokens, max_stroke_length=32): # model 用
-    # 開始、結束、padding
+  def convert_tokens_to_stroke_ids(self, tokens, max_stroke_length=32):
+    """
+    最終給 modeling.embedding_stroke_cnn() 用
+    """
+    # 模擬 ELMo，加入 [開始、結束、padding] token IDs
     start = 6
     end = 7
     padding = 8
@@ -398,6 +401,10 @@ class StrokeTokenizer(object):
       strokes = [start]
       if token in self.stroke_vocab:
         strokes.extend(self.stroke_vocab[token])
+      else:
+        # 模擬 EMLo 做法，將 char 轉爲 UTF-8
+        token_encoded = token.encode('utf-8', 'ignore')
+        strokes.extend(token_encoded)
       strokes = strokes[:max_stroke_length-1]
       strokes.append(end)
       while len(strokes) < max_stroke_length:

@@ -587,6 +587,22 @@ def embedding_stroke_cnn(input_tensor,
         outputs.append(output_conv)
     output = tf.concat(outputs, 2)
 
+    output_shape = get_shape_list(output)
+    highway_dim = output_shape[-1]
+    output = tf.reshape(output, [-1, highway_dim])
+    with tf.variable_scope("highway"):
+      gate = tf.keras.layers.Dense(
+          units=highway_dim,
+          activation=tf.nn.sigmoid,
+          kernel_initializer=create_initializer(initializer_range))(output)
+      transform = tf.keras.layers.Dense(
+          units=highway_dim,
+          activation=tf.nn.relu,
+          kernel_initializer=create_initializer(initializer_range))(output)
+      output = gate * transform + (1.0 - gate) * output
+    output = tf.reshape(output, output_shape)
+      
+
     with tf.variable_scope("output"):
       projection = tf.keras.layers.Dense(
           units=width,
@@ -595,6 +611,7 @@ def embedding_stroke_cnn(input_tensor,
       output = projection(output)
 
   # output = layer_norm_and_dropout(output, dropout_prob)
+  # initializer?
   # highway?
 # ------------------CNN-----------------end
   return output
