@@ -6,6 +6,7 @@ import numpy as np
 from bilm.training import train, load_options_latest_checkpoint, load_vocab
 from bilm.data import BidirectionalLMDataset
 import os
+import json
 
 
 def main(args):
@@ -65,6 +66,13 @@ def main(args):
     option_file = os.path.join(args.save_dir, "options.json")
     with open(option_file, "r") as f:
         options = json.load(f)
+    
+    if options["char_cnn"]["max_characters_per_token"] != max_token_length:
+        options["char_cnn"]["max_characters_per_token"] = max_token_length
+        print("Wrong max_token_length, already corrected")
+    if options["char_cnn"]["n_characters"] != 266:
+        options["char_cnn"]["n_characters"] = 266
+        print("Wrong n_characters, already corrected")
     # End
 
     prefix = args.train_prefix

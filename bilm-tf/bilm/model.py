@@ -399,7 +399,16 @@ class BidirectionalLanguageModelGraph(object):
 
             return tf.concat(convolutions, 2)
 
-        embedding = make_convolutions(self.char_embedding)
+        embedding = make_convolutions(self.char_embedding) # Winfred
+
+        # Add by Winfred
+        def make_concat(inp):
+            inp_shape = tf.shape(inp)[0:2]
+            inp_shape = tf.concat([inp_shape, [max_chars * char_embed_dim]], axis=0)
+            return tf.reshape(inp, inp_shape)
+        # embedding = make_concat(self.char_embedding)
+        # n_filters = max_chars * char_embed_dim
+        # End
 
         # for highway and projection layers
         n_highway = cnn_options.get('n_highway')

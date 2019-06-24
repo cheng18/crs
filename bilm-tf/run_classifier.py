@@ -638,9 +638,9 @@ def create_model(is_training, input_a_ids, input_b_ids, label_ids, num_labels,
     a_embedding = embed(input_a_ids)
     b_embedding = embed(input_b_ids)
 
-  # translate = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(300, activation='relu'))
-  # a_embedding = translate(a_embedding)
-  # b_embedding = translate(b_embedding)
+  translate = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(300, activation='relu'))
+  a_embedding = translate(a_embedding)
+  b_embedding = translate(b_embedding)
 
   layer_LSTM = tf.keras.layers.LSTM(300)
   output_a = layer_LSTM(a_embedding)

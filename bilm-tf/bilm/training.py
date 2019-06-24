@@ -221,15 +221,24 @@ class LanguageModel(object):
             return tf.concat(convolutions, 2)
 
         # for first model, this is False, for others it's True
-        reuse = tf.get_variable_scope().reuse
-        embedding = make_convolutions(self.char_embedding, reuse)
+        reuse = tf.get_variable_scope().reuse  # Winfred
+        embedding = make_convolutions(self.char_embedding, reuse) # Winfred
+
+        # Add by Winfred
+        def make_concat(inp):
+            return tf.reshape(inp, 
+                    [batch_size, unroll_steps, max_chars * char_embed_dim])
+        # embedding = make_concat(self.char_embedding)
+        # n_filters = max_chars * char_embed_dim
+        # End
 
         self.token_embedding_layers = [embedding]
 
         if self.bidirectional:
             # re-use the CNN weights from forward pass
-            embedding_reverse = make_convolutions(
-                self.char_embedding_reverse, True)
+            embedding_reverse = make_convolutions( # Winfred
+                self.char_embedding_reverse, True) # Winfred
+            # embedding_reverse = make_concat(self.char_embedding_reverse) # Add by Winfred
 
         # for highway and projection layers:
         #   reshape from (batch_size, n_tokens, dim) to
