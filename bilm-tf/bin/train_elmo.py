@@ -10,11 +10,13 @@ import json
 
 
 def main(args):
-    max_token_length = int(args.max_token_length)
+    max_token_length = args.max_token_length and int(args.max_token_length)
+    print("args.vocab_file: ", args.vocab_file)
+    print("max_token_length: ", max_token_length)
+    print("args.stroke_vocab_file: ", args.stroke_vocab_file)
 
     # load the vocab
     # vocab = load_vocab(args.vocab_file, 50) 
-    print(args.stroke_vocab_file)
     vocab = load_vocab(args.vocab_file, 
                        args.stroke_vocab_file, # Winfred stroke_vocab
                        max_token_length) # Winfred stroke_vocab
@@ -67,10 +69,10 @@ def main(args):
     with open(option_file, "r") as f:
         options = json.load(f)
     
-    if options["char_cnn"]["max_characters_per_token"] != max_token_length:
+    if max_token_length:
         options["char_cnn"]["max_characters_per_token"] = max_token_length
         print("Wrong max_token_length, already corrected")
-    if options["char_cnn"]["n_characters"] != 266:
+    if "char_cnn" in options:
         options["char_cnn"]["n_characters"] = 266
         print("Wrong n_characters, already corrected")
     # End

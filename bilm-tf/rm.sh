@@ -1,5 +1,5 @@
 
-export BASE_DIR=/home/hchuang/Workspaces/crs/bilm-tf/model/stroke_AA_t_1927979_e10_noshuffle_mtl50_1
+export BASE_DIR=/home/hchuang/Workspaces/crs/bilm-tf/model/pattern_stroke_AA_t
 rm $BASE_DIR/checkpoint \
   $BASE_DIR/events.out* \
   $BASE_DIR/model.ckpt* \

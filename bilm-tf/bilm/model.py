@@ -422,7 +422,7 @@ class BidirectionalLanguageModelGraph(object):
 
         # set up weights for projection
         if use_proj:
-            assert n_filters > projection_dim
+            assert n_filters > projection_dim # Winfred
             with tf.variable_scope('CNN_proj') as scope:
                     W_proj_cnn = tf.get_variable(
                         "W_proj", [n_filters, projection_dim],
