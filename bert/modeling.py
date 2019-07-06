@@ -572,7 +572,7 @@ def embedding_stroke_cnn(input_tensor,
             padding='valid',
             data_format='channels_last',
             dilation_rate=(1, 1),
-            activation=tf.nn.relu,
+            # activation=tf.nn.relu, # elmo method
             kernel_initializer=create_initializer(initializer_range))
         output_conv = conv(input_strokes)
         max_pooling = tf.keras.layers.MaxPool2D(
@@ -581,6 +581,7 @@ def embedding_stroke_cnn(input_tensor,
             padding='valid',
             data_format='channels_last')
         output_conv = max_pooling(output_conv)
+        output_conv = tf.nn.relu(output_conv) # elmo method
         # conv shape [batch_size, seq_length, 1, embedding]
         output_conv = tf.squeeze(output_conv, axis=[2])
         # conv shape [batch_size, seq_length, embedding] 
@@ -590,29 +591,27 @@ def embedding_stroke_cnn(input_tensor,
     output_shape = get_shape_list(output)
     highway_dim = output_shape[-1]
     output = tf.reshape(output, [-1, highway_dim])
-    with tf.variable_scope("highway"):
-      gate = tf.keras.layers.Dense(
-          units=highway_dim,
-          activation=tf.nn.sigmoid,
-          kernel_initializer=create_initializer(initializer_range))(output)
-      transform = tf.keras.layers.Dense(
-          units=highway_dim,
-          activation=tf.nn.relu,
-          kernel_initializer=create_initializer(initializer_range))(output)
-      output = gate * transform + (1.0 - gate) * output
+    for i in range(2):
+      with tf.variable_scope("highway_%s" % i):
+        gate = tf.keras.layers.Dense(
+            units=highway_dim,
+            activation=tf.nn.sigmoid,
+            kernel_initializer=create_initializer(initializer_range))(output)
+        transform = tf.keras.layers.Dense(
+            units=highway_dim,
+            activation=tf.nn.relu,
+            kernel_initializer=create_initializer(initializer_range))(output)
+        output = gate * transform + (1.0 - gate) * output
     output = tf.reshape(output, output_shape)
       
-
-    with tf.variable_scope("output"):
+    with tf.variable_scope("projection"):
       projection = tf.keras.layers.Dense(
           units=width,
-          activation=tf.nn.relu,
           kernel_initializer=create_initializer(initializer_range))
       output = projection(output)
 
   # output = layer_norm_and_dropout(output, dropout_prob)
   # initializer?
-  # highway?
 # ------------------CNN-----------------end
   return output
 # end

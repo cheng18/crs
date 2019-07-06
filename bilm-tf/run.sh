@@ -1,7 +1,17 @@
 
-export NAME=char_AA_s_10731134_e8_noshuffle
+export NAME=xnli
 chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
 /crs_elmo/bilm-tf/model/$NAME/command.sh
+
+export NAME=lcqmc
+chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
+/crs_elmo/bilm-tf/model/$NAME/command.sh
+
+
+
+# export NAME=char_AA_s_10731134_e8_noshuffle
+# chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
+# /crs_elmo/bilm-tf/model/$NAME/command.sh
 # rm /crs_elmo/bilm-tf/model/$NAME/checkpoint \
 #   /crs_elmo/bilm-tf/model/$NAME/events.out* \
 #   /crs_elmo/bilm-tf/model/$NAME/model.ckpt* \
@@ -13,9 +23,9 @@ chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
 #   /crs_elmo/bilm-tf/model/$NAME/*/model.ckpt*
 # rm -r /crs_elmo/bilm-tf/model/$NAME/*/eval
 
-export NAME=stroke_AA_s_10731134_e8_noshuffle_mtl30
-chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
-/crs_elmo/bilm-tf/model/$NAME/command.sh
+# export NAME=stroke_AA_s_10731134_e8_noshuffle_mtl30
+# chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
+# /crs_elmo/bilm-tf/model/$NAME/command.sh
 # rm /crs_elmo/bilm-tf/model/$NAME/checkpoint \
 #   /crs_elmo/bilm-tf/model/$NAME/events.out* \
 #   /crs_elmo/bilm-tf/model/$NAME/model.ckpt* \
@@ -27,9 +37,9 @@ chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
 #   /crs_elmo/bilm-tf/model/$NAME/*/model.ckpt*
 # rm -r /crs_elmo/bilm-tf/model/$NAME/*/eval
 
-export NAME=strokeseq_AA_s_10731134_e8_noshuffle_mtl30
-chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
-/crs_elmo/bilm-tf/model/$NAME/command.sh
+# export NAME=strokeseq_AA_s_10731134_e8_noshuffle_mtl30
+# chmod +x /crs_elmo/bilm-tf/model/$NAME/command.sh
+# /crs_elmo/bilm-tf/model/$NAME/command.sh
 # rm /crs_elmo/bilm-tf/model/$NAME/checkpoint \
 #   /crs_elmo/bilm-tf/model/$NAME/events.out* \
 #   /crs_elmo/bilm-tf/model/$NAME/model.ckpt* \
