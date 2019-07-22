@@ -10,9 +10,9 @@ command 參考 ```docker command.sh```。
 # 預訓練資料集
 資料集如 pre-training_data 資料夾內（無開源），zhwiki-20181101-pages-articles 的語料庫是經過 https://github.com/attardi/wikiextractor 處理的維基資料集，並進行簡繁轉換輸出未轉換、轉簡體、轉繁體，三種預訓練資料集。
 
-前處理 command 如：
+- 環境：```elmo docker```
+- 前處理 command 如：
 ```
-# elmo docker
 export PRE_TRAINING_DIR=/crs_elmo/pre-training_data
 python /crs_elmo/preprocessing_pre-training_data.py \
   --input_file=$PRE_TRAINING_DIR/zhwiki-20181101-pages-articles/AA/* \
@@ -21,9 +21,8 @@ python /crs_elmo/preprocessing_pre-training_data.py \
 
 # 下游任務資料集
 資料集如 downstream_data 資料夾內（無開源），分爲 XNLI、LCQMC，並進行簡繁轉換輸出未轉換、轉簡體、轉繁體，三種下游任務資料集。
-環境：```elmo docker```
-
-前處理 command 如：
+- 環境：```elmo docker```
+- 前處理 command 如：
 ```
 python /crs_elmo/preprocessing_downstream_data.py 
 ```
@@ -31,10 +30,9 @@ python /crs_elmo/preprocessing_downstream_data.py
 
 # ELMo+S
 code 如 bilm-tf，參考 ELMo 原程式碼。
-已訓練好模型存於 ```bilm-tf/model``` （未開源）
-環境：```elmo docker```
-
-stroke command 範例：
+- 已訓練好模型存於 ```bilm-tf/model``` （未開源）
+- 環境：```elmo docker```
+- stroke command 範例：
 ```
 export PRE_TRAINING_DIR=/crs_elmo/pre-training_data
 export DOWNSTREAM_DIR=/crs_elmo/downstream_data
@@ -95,8 +93,7 @@ python3 /crs_elmo/bilm-tf/run_classifier.py \
   --stroke_vocab_file=$BASE_DIR/stroke.csv \
   --max_token_length=$MAX_TOKEN_LENGTH 
 ```
-
-char command 範例：
+- char command 範例：
 ```
 export PRE_TRAINING_DIR=/crs_elmo/pre-training_data
 export DOWNSTREAM_DIR=/crs_elmo/downstream_data
@@ -151,10 +148,9 @@ python3 /crs_elmo/bilm-tf/run_classifier.py \
 
 # BERT+S
 code 如 bert，參考 BERT 原程式碼。
-已訓練好模型存於 ```bert/model``` （未開源）
-環境：```bert docker```
-
-stroke command 範例：
+- 已訓練好模型存於 ```bert/model``` （未開源）
+- 環境：```bert docker```
+- stroke command 範例：
 ```
 export PRE_TRAINING_DIR=/crs/pre-training_data
 export DOWNSTREAM_DIR=/crs/downstream_data
@@ -228,8 +224,7 @@ time python3 /crs/bert/run_classifier.py \
   --max_stroke_length=$MAX_TOKEN_LENGTH \
   --stroke_vocab_file=$BERT_BASE_DIR/stroke.csv
 ```
-
-char command 範例：
+- char command 範例：
 ```
 export PRE_TRAINING_DIR=/crs/pre-training_data
 export DOWNSTREAM_DIR=/crs/downstream_data
