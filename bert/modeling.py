@@ -361,7 +361,8 @@ def get_assignment_map_from_checkpoint(tvars, init_checkpoint):
     (name, var) = (x[0], x[1])
     if name not in name_to_variable:
       continue
-    assignment_map[name] = name
+    # assignment_map[name] = name # Winfed
+    assignment_map[name] = name_to_variable[name] # Modify by Winfred
     initialized_variable_names[name] = 1
     initialized_variable_names[name + ":0"] = 1
 
